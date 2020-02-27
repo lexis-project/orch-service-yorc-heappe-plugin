@@ -1,0 +1,41 @@
+- name: Install unzip
+  hosts: all
+  strategy: free
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Ubuntu - install unzip
+      apt:
+        name:
+          - unzip
+        state: present
+        update_cache: yes
+      register: apt_res
+      retries: 3
+      until: apt_res is success
+      when: ansible_distribution == 'Ubuntu'
+    - name: RedHat - install unzip
+      yum:
+        name:
+          - unzip
+        state: present
+        disablerepo: "docker"
+        update_cache: yes
+      when: ansible_os_family == 'RedHat'
+
+    - name: Debian - install unzip
+      apt:
+        name:
+          - unzip
+        state: present
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+- name: Copy HEAppE job results playbook
+  hosts: all
+  tasks:
+    - name: Copy HEAppE job results to "{{ DEST_DIR }}"
+      unarchive:
+        src: "{{ ZIP_SRC }}"
+        dest: "{{ DEST_DIR }}"
+      when: (ZIP_SRC is defined) and (ZIP_SRC|length > 0)

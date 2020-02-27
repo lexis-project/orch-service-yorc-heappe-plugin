@@ -1,0 +1,192 @@
+tosca_definitions_version: alien_dsl_2_0_0
+
+metadata:
+  template_name: HEAppETest
+  template_version: 0.1.0-SNAPSHOT
+  template_author: yorc
+
+description: ""
+
+imports:
+  - yorc-types:1.1.0
+  - tosca-normative-types:1.0.0-ALIEN20
+  - docker-types:2.2.0-SM9
+  - alien-base-types:2.2.0-SM9
+  - heappe-types:0.1.0
+
+topology_template:
+  input_artifacts:
+    zip_dataset:
+        type: tosca.artifacts.File
+  node_templates:
+    HEAppEJob:
+      type: org.heappe.nodes.Job
+      properties:
+        jobSpecification: 
+          name: testJobName
+          project: testProjectName
+          clusterNodeTypeId: 1
+          priority: 4
+          minCores: 1
+          maxCores: 1
+          waitingLimit: 600
+          walltimeLimit: 600
+          tasks: 
+            - name: testTaskName
+              commandTemplateId: 1
+              templateParameterValues: 
+                - commandParameterIdentifier: inputParam
+                  parameterValue: inputParam
+              minCores: 1
+              maxCores: 1
+              walltimeLimit: 600
+              standardOutputFile: "console_Stdout"
+              standardErrorFile: "console_Stderr"
+              progressFile: "console_Stdprog"
+              logFile: "console_Stdlog"
+    SendDataset:
+      type: org.heappe.nodes.Dataset
+      artifacts:
+        zip_dataset:
+          file: { get_input_artifact: zip_dataset }
+          type: tosca.artifacts.File
+      requirements:
+        - dependsOnbHeappejob:
+            type_requirement: job
+            node: HEAppEJob
+            capability: org.heappe.capabilities.HeappeJob
+            relationship: org.heappe.relationships.DependsOnJob
+  workflows:
+    install:
+      steps:
+        HEAppEJob_create:
+          target: HEAppEJob
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: Standard.create
+          on_success:
+            - HEAppEJob_started
+        HEAppEJob_started:
+          target: HEAppEJob
+          activities:
+            - set_state: started
+          on_success:
+            - SendDataset_create
+        SendDataset_create:
+          target: SendDataset
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: Standard.create
+          on_success:
+            - SendDataset_started
+        SendDataset_started:
+          target: SendDataset
+          activities:
+            - set_state: started
+    uninstall:
+      steps:
+        SendDataset_delete:
+          target: SendDataset
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: Standard.delete
+          on_success:
+            - SendDataset_deleted
+        SendDataset_deleted:
+          target: SendDataset
+          activities:
+            - set_state: started
+          on_success:
+            - HEAppEJob_delete
+        HEAppEJob_delete:
+          target: HEAppEJob
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: Standard.delete
+          on_success:
+            - HEAppEJob_deleted
+        HEAppEJob_deleted:
+          target: HEAppEJob
+          activities:
+            - set_state: deleted
+    start:
+      steps:
+        Job_start:
+          target: HEAppEJob
+          activities:
+            - delegate: start
+          on_success:
+            - SendDataset_start
+        SendDataset_start:
+          target: SendDataset
+          activities:
+            - delegate: start
+    stop:
+      steps:
+        Job_stop:
+          target: HEAppEJob
+          activities:
+            - delegate: stop
+        SendDataset_stop:
+          target: SendDataset
+          activities:
+            - delegate: stop
+          on_success:
+            - Job_stop
+    run:
+      steps:
+        Job_run:
+          target: HEAppEJob
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: tosca.interfaces.node.lifecycle.Runnable.run
+          on_success:
+            - Job_executed
+        Job_submitted:
+          target: HEAppEJob
+          activities:
+            - set_state: submitted
+          on_success:
+            - Job_executing
+        Job_submitting:
+          target: HEAppEJob
+          activities:
+            - set_state: submitting
+          on_success:
+            - Job_submit
+        Job_executed:
+          target: HEAppEJob
+          activities:
+            - set_state: executed
+        Job_submit:
+          target: HEAppEJob
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: tosca.interfaces.node.lifecycle.Runnable.submit
+          on_success:
+            - Job_submitted
+        Job_executing:
+          target: HEAppEJob
+          activities:
+            - set_state: executing
+          on_success:
+            - Job_run
+    cancel:
+      steps:
+        Job_cancelled:
+          target: HEAppEJob
+          activities:
+            - set_state: cancelled
+        Job_cancel:
+          target: HEAppEJob
+          operation_host: ORCHESTRATOR
+          activities:
+            - call_operation: tosca.interfaces.node.lifecycle.Runnable.cancel
+          on_success:
+            - Job_cancelled
+        Job_cancelling:
+          target: HEAppEJob
+          activities:
+            - set_state: cancelling
+          on_success:
+            - Job_cancel

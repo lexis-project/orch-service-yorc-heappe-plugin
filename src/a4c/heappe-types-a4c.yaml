@@ -1,0 +1,360 @@
+tosca_definitions_version: alien_dsl_2_0_0
+
+metadata:
+  template_name: heappe-types
+  template_version: 0.1.0
+  template_author: yorc
+
+imports:
+  - tosca-normative-types:1.0.0-ALIEN20
+  - yorc-types:1.1.0
+
+data_types:
+  org.heappe.types.CommandTemplateParameterValue:
+    derived_from: tosca.datatypes.Root
+    properties:
+      commandParameterIdentifier:
+        description: Command parameter identifier
+        type: string
+        required: true
+      parameterValue:
+        description: Command parameter value
+        type: string
+  org.heappe.types.EnvironmentVariable:
+    derived_from: tosca.datatypes.Root
+    properties:
+      name:
+        description: Environment variable name
+        type: string
+        required: true
+      value:
+        description: Environment variable value
+        type: string
+  org.heappe.types.TaskSpecification:
+    derived_from: tosca.datatypes.Root
+    properties:
+      name:
+        description: Task name
+        type: string
+        required: true
+      commandTemplateId:
+        description: Command template ID
+        type: string
+        required: true
+      templateParameterValues:
+        description: Command template parameters
+        type: list
+        entry_schema:
+          type: org.heappe.types.CommandTemplateParameterValue
+        required: false
+      environmentVariables:
+        description: Environment variables
+        type: list
+        entry_schema:
+          type: org.heappe.types.EnvironmentVariable
+        required: false
+      minCores:
+        description: Minimum number of cores required
+        type: integer
+        default: 1
+      maxCores:
+        description: Maximum number of cores required
+        type: integer
+        default: 1
+      walltimeLimit:
+        description: Maximum time for the task to run (in seconds)
+        type: integer
+        default: 600
+      standardOutputFile:
+        type: string
+        default: "console_Stdout"
+      standardErrorFile:
+        type: string
+        default: "console_Stderr"
+      progressFile:
+        type: string
+        default: "console_Stdprog"
+      logFile:
+        type: string
+        default: "console_Stdlog"
+  org.heappe.types.JobSpecification:
+    derived_from: tosca.datatypes.Root
+    properties:
+      name:
+        description: Job name
+        type: string
+        required: true
+      project:
+        description: Accounting project
+        type: string
+        required: true
+      clusterNodeTypeId :
+        description: Cluster node type
+        type: integer
+        required: true
+      tasks :
+        description: Tasks (at leat one task needs to be defined)
+        type: list
+        entry_schema:
+          type: org.heappe.types.TaskSpecification
+        required: true
+      priority:
+        description: Job priority
+        type: integer
+        default: 4
+      minCores:
+        description: Minimum number of cores required
+        type: integer
+        default: 1
+      maxCores:
+        description: Maximum number of cores required
+        type: integer
+        default: 1
+      waitingLimit:
+        description: Limit for the waiting time in cluster queue (seconds)
+        type: integer
+        default: 600
+      walltimeLimit:
+        description: Maximum time for the job to run (in seconds)
+        type: integer
+        default: 600
+  org.heappe.types.FileTransfer:
+    derived_from: tosca.datatypes.Root
+    properties:
+      user:
+        type: string
+        description: >
+          User used to transfer files to/from job
+      key:
+        type: string
+        description: >
+          Key used to transfer files to/from job
+      server:
+        type: string
+        description: >
+          Server host name used to transfer files to/from job
+      path:
+        type: string
+        description: >
+          Path on remote server where to store/get job files
+artifact_types:
+  org.heappe.artifacts.Deployment:
+    derived_from: tosca.artifacts.Deployment
+  tosca.artifacts.Deployment.Image.Container.Docker:
+    description: Docker Container Image
+    derived_from: tosca.artifacts.Deployment.Image
+node_types:
+  org.heappe.nodes.pub.Job:
+    derived_from: tosca.nodes.Root
+    abstract: true
+    description: >
+      HEAppE Job (abstract)
+    properties:
+      jobSpecification:
+        description: Specification of the job to create
+        type: org.heappe.types.JobSpecification
+        required: true
+    attributes:
+      job_id:
+        type: string
+        description: >
+          ID of the HEAppE job created
+      file_transfer:
+        type: org.heappe.types.FileTransfer
+        description: >
+          File transfer settings
+      changed_files:
+        type: list
+        # entry schema not expected by Alien4Cloud
+        # entry_schema:
+        #  type: string
+        description: List of files created or changed by the job execution
+    capabilities:
+      heappejob:
+        type: org.heappe.capabilities.HeappeJob
+    interfaces:
+      Standard:
+        create:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        delete:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+      custom:
+        enable_file_transfer:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        disable_file_transfer:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        list_changed_files:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+      tosca.interfaces.node.lifecycle.Runnable:
+        submit:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        run:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        cancel:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+    tags:
+      icon: /images/heappejob.png
+  org.heappe.nodes.Job:
+    derived_from: org.heappe.nodes.pub.Job
+    description: >
+      HEAppE Job
+  org.heappe.nodes.pub.Dataset:
+    derived_from: tosca.nodes.Root
+    abstract: true
+    description: >
+      Transfer a zipped dataset to a HEAppEJob input files directory (abstract)
+    artifacts:
+      - zip_dataset:
+          type: tosca.artifacts.File
+          file: heappe-types-a4c.yaml
+    requirements:
+      - job:
+          capability: org.heappe.capabilities.HeappeJob
+          node: org.heappe.nodes.pub.Job
+          relationship: org.heappe.relationships.SendInputsToJob
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        create:
+          inputs:
+            JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        delete:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+      Custom:
+        sendJobInputs:
+          inputs:
+            JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker        
+    tags:
+      icon: /images/heappedataset.png
+  org.heappe.nodes.Dataset:
+    derived_from: org.heappe.nodes.pub.Dataset
+    description: >
+      Transfer a dataset to a HEAppEJob input files directory
+  org.heappe.nodes.pub.Results:
+    derived_from: tosca.nodes.Root
+    abstract: true
+    description: >
+      Get result files from a HEAppEJob (abstract) 
+    attributes:
+      zip_result:
+        type: string
+        description: >
+          Name of Zip file containing results files retrieved from the job
+    capabilities:
+      job_results:
+        type: org.heappe.capabilities.HeappeJobResults
+    requirements:
+      - job:
+          capability: org.heappe.capabilities.HeappeJob
+          node: org.heappe.nodes.pub.Job
+          relationship: org.heappe.relationships.GetResultsFromJob
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        create:
+          inputs:
+            JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        delete:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+      Custom:
+        getResults:
+          inputs:
+            JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+    tags:
+      icon: /images/heapperesults.png
+  org.heappe.nodes.Results:
+    derived_from: org.heappe.nodes.pub.Results
+    description: >
+      Get result files from a HEAppEJob
+  org.heappe.nodes.pub.CopyResults:
+    derived_from: tosca.nodes.SoftwareComponent
+    abstract: true
+    description: >
+      Copy HEAppE Job results on host (abstract) 
+    properties:
+      destination_dir:
+        type: string
+        description: >
+          Destination directory where to copy files
+        required: true
+    requirements:
+      - job_results:
+          capability: org.heappe.capabilities.HeappeJobResults
+          node: org.heappe.nodes.pub.Results
+          relationship: org.heappe.relationships.CopyResults
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        create:
+          implementation: playbooks/noop.yaml
+        delete:
+          implementation: playbooks/noop.yaml
+      Custom:
+        copyResults:
+          inputs:
+            ZIP_SRC: { get_attribute: [REQ_TARGET, job_results, zip_result] }
+            DEST_DIR: { get_property: [SELF, destination_dir] }
+          implementation: playbooks/copy.yaml
+    tags:
+      icon: /images/heappecopy.png
+  org.heappe.nodes.CopyResults:
+    derived_from: org.heappe.nodes.pub.CopyResults
+    description: >
+      Copy HEAppE Job results on host
+
+capability_types:
+  org.heappe.capabilities.HeappeJob:
+    derived_from: tosca.capabilities.Root
+    description: >
+      A capability fulfilling requirements of a node requiring to be
+      associated with a HEAppE Job.
+  org.heappe.capabilities.HeappeJobResults:
+    derived_from: tosca.capabilities.Root
+    description: >
+      A capability fulfilling requirements of a node requiring to be
+      associated with HEAppE Job Results.
+relationship_types:
+  org.heappe.relationships.DependsOnJob:
+    derived_from: tosca.relationships.DependsOn
+    description: Relationship between a component and a HEAppE job
+    valid_target_types: [ org.heappe.nodes.pub.Job ]
+  org.heappe.relationships.SendInputsToJob:
+    derived_from: org.heappe.relationships.DependsOnJob
+  org.heappe.relationships.GetResultsFromJob:
+    derived_from: org.heappe.relationships.DependsOnJob
+  org.heappe.relationships.CopyResults:
+    derived_from: tosca.relationships.DependsOn
+    description: Relationship between a component and a HEAppE job Results
+    valid_target_types: [ org.heappe.nodes.pub.Results ]

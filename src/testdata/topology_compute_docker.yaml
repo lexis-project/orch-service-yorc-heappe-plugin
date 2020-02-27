@@ -1,0 +1,381 @@
+tosca_definitions_version: alien_dsl_2_0_0
+
+metadata:
+  template_name: TestDocker
+  template_version: 0.1.0-SNAPSHOT
+  template_author: lexisadmin
+
+description: ""
+
+imports:
+  - yorc-types:1.1.0
+  - org.ystia.docker.containers.docker.generic:2.2.0-SNAPSHOT
+  - tosca-normative-types:1.0.0-ALIEN20
+  - docker-types:2.2.0-SM9
+  - org.ystia.docker.ansible:2.2.0-SNAPSHOT
+
+topology_template:
+  node_templates:
+    PublicNet:
+      type: tosca.nodes.Network
+      properties:
+        ip_version: 4
+    VirtualMachine:
+      type: tosca.nodes.Compute
+      requirements:
+        - networkPublicNetConnection:
+            type_requirement: network
+            node: PublicNet
+            capability: tosca.capabilities.Connectivity
+            relationship: tosca.relationships.Network
+      capabilities:
+        scalable:
+          properties:
+            min_instances: 1
+            max_instances: 1
+            default_instances: 1
+        endpoint:
+          properties:
+            secure: true
+            protocol: tcp
+            network_name: PRIVATE
+            initiator: source
+    Docker:
+      type: org.ystia.docker.ansible.nodes.Docker
+      properties:
+        docker_version: ""
+      requirements:
+        - hostedOnVirtualMachineHost:
+            type_requirement: host
+            node: VirtualMachine
+            capability: tosca.capabilities.Container
+            relationship: tosca.relationships.HostedOn
+    Apache:
+      type: org.ystia.docker.containers.docker.generic.nodes.GenericContainer
+      properties:
+        auto_remove: false
+        cleanup: false
+        detach: true
+        image: "httpd:latest"
+        keep_volumes: true
+        published_ports: 
+          - "8080:80"
+        restart_policy: no
+        cpu_share: 1.0
+        mem_share: "128 MB"
+        docker_bash_cmd: 
+          - "/bin/bash"
+          - "-c"
+      requirements:
+        - hostedOnContainerRuntimeDockerHost:
+            type_requirement: host
+            node: Docker
+            capability: org.alien4cloud.extended.container.capabilities.ApplicationHost
+            relationship: org.alien4cloud.extended.container.relationships.HostedOnContainerRuntime
+      capabilities:
+        scalable:
+          properties:
+            min_instances: 1
+            max_instances: 1
+            default_instances: 1
+  workflows:
+    install:
+      steps:
+        Docker_configure:
+          target: Docker
+          activities:
+            - call_operation: Standard.configure
+          on_success:
+            - Docker_configured
+        FIPVirtualMachine_install:
+          target: FIPVirtualMachine
+          activities:
+            - delegate: install
+          on_success:
+            - Compute_install
+        GenericContainer_starting:
+          target: Apache
+          activities:
+            - set_state: starting
+          on_success:
+            - GenericContainer_start
+        GenericContainer_configuring:
+          target: Apache
+          activities:
+            - set_state: configuring
+          on_success:
+            - GenericContainer_configured
+        Docker_create:
+          target: Docker
+          activities:
+            - call_operation: Standard.create
+          on_success:
+            - Docker_created
+        Compute_install:
+          target: VirtualMachine
+          activities:
+            - delegate: install
+          on_success:
+            - Docker_initial
+        GenericContainer_create:
+          target: Apache
+          activities:
+            - call_operation: Standard.create
+          on_success:
+            - GenericContainer_created
+        GenericContainer_started:
+          target: Apache
+          activities:
+            - set_state: started
+        GenericContainer_creating:
+          target: Apache
+          activities:
+            - set_state: creating
+          on_success:
+            - GenericContainer_create
+        GenericContainer_initial:
+          target: Apache
+          activities:
+            - set_state: initial
+          on_success:
+            - GenericContainer_creating
+        Docker_initial:
+          target: Docker
+          activities:
+            - set_state: initial
+          on_success:
+            - Docker_creating
+        Docker_configured:
+          target: Docker
+          activities:
+            - set_state: configured
+          on_success:
+            - Docker_starting
+        Docker_creating:
+          target: Docker
+          activities:
+            - set_state: creating
+          on_success:
+            - Docker_create
+        Docker_configuring:
+          target: Docker
+          activities:
+            - set_state: configuring
+          on_success:
+            - Docker_configure
+        Docker_starting:
+          target: Docker
+          activities:
+            - set_state: starting
+          on_success:
+            - Docker_start
+        GenericContainer_created:
+          target: Apache
+          activities:
+            - set_state: created
+          on_success:
+            - GenericContainer_configuring
+        Docker_started:
+          target: Docker
+          activities:
+            - set_state: started
+          on_success:
+            - GenericContainer_initial
+        Docker_start:
+          target: Docker
+          activities:
+            - call_operation: Standard.start
+          on_success:
+            - Docker_started
+        Docker_created:
+          target: Docker
+          activities:
+            - set_state: created
+          on_success:
+            - Docker_configuring
+        GenericContainer_start:
+          target: Apache
+          activities:
+            - call_operation: Standard.start
+          on_success:
+            - GenericContainer_started
+        GenericContainer_configured:
+          target: Apache
+          activities:
+            - set_state: configured
+          on_success:
+            - GenericContainer_starting
+    uninstall:
+      steps:
+        GenericContainer_delete:
+          target: Apache
+          activities:
+            - call_operation: Standard.delete
+          on_success:
+            - GenericContainer_deleted
+        Compute_uninstall:
+          target: VirtualMachine
+          activities:
+            - delegate: uninstall
+          on_success:
+            - FIPVirtualMachine_uninstall
+        Docker_stopping:
+          target: Docker
+          activities:
+            - set_state: stopping
+          on_success:
+            - Docker_stop
+        Docker_deleting:
+          target: Docker
+          activities:
+            - set_state: deleting
+          on_success:
+            - Docker_deleted
+        GenericContainer_deleting:
+          target: Apache
+          activities:
+            - set_state: deleting
+          on_success:
+            - GenericContainer_delete
+        FIPVirtualMachine_uninstall:
+          target: FIPVirtualMachine
+          activities:
+            - delegate: uninstall
+        GenericContainer_stopping:
+          target: Apache
+          activities:
+            - set_state: stopping
+          on_success:
+            - GenericContainer_stop
+        GenericContainer_stop:
+          target: Apache
+          activities:
+            - call_operation: Standard.stop
+          on_success:
+            - GenericContainer_stopped
+        Docker_deleted:
+          target: Docker
+          activities:
+            - set_state: deleted
+          on_success:
+            - Compute_uninstall
+        GenericContainer_deleted:
+          target: Apache
+          activities:
+            - set_state: deleted
+          on_success:
+            - Docker_stopping
+        GenericContainer_stopped:
+          target: Apache
+          activities:
+            - set_state: stopped
+          on_success:
+            - GenericContainer_deleting
+        Docker_stop:
+          target: Docker
+          activities:
+            - call_operation: Standard.stop
+          on_success:
+            - Docker_stopped
+        Docker_stopped:
+          target: Docker
+          activities:
+            - set_state: stopped
+          on_success:
+            - Docker_deleting
+    start:
+      steps:
+        FIPVirtualMachine_start:
+          target: FIPVirtualMachine
+          activities:
+            - delegate: start
+          on_success:
+            - Compute_start
+        Docker_starting:
+          target: Docker
+          activities:
+            - set_state: starting
+          on_success:
+            - Docker_start
+        GenericContainer_started:
+          target: Apache
+          activities:
+            - set_state: started
+        Docker_started:
+          target: Docker
+          activities:
+            - set_state: started
+          on_success:
+            - GenericContainer_starting
+        Compute_start:
+          target: VirtualMachine
+          activities:
+            - delegate: start
+          on_success:
+            - Docker_starting
+        GenericContainer_starting:
+          target: Apache
+          activities:
+            - set_state: starting
+          on_success:
+            - GenericContainer_start
+        Docker_start:
+          target: Docker
+          activities:
+            - call_operation: Standard.start
+          on_success:
+            - Docker_started
+        GenericContainer_start:
+          target: Apache
+          activities:
+            - call_operation: Standard.start
+          on_success:
+            - GenericContainer_started
+    stop:
+      steps:
+        GenericContainer_stopping:
+          target: Apache
+          activities:
+            - set_state: stopping
+          on_success:
+            - GenericContainer_stop
+        GenericContainer_stop:
+          target: Apache
+          activities:
+            - call_operation: Standard.stop
+          on_success:
+            - GenericContainer_stopped
+        Docker_stopping:
+          target: Docker
+          activities:
+            - set_state: stopping
+          on_success:
+            - Docker_stop
+        GenericContainer_stopped:
+          target: Apache
+          activities:
+            - set_state: stopped
+          on_success:
+            - Docker_stopping
+        Docker_stop:
+          target: Docker
+          activities:
+            - call_operation: Standard.stop
+          on_success:
+            - Docker_stopped
+        Docker_stopped:
+          target: Docker
+          activities:
+            - set_state: stopped
+          on_success:
+            - Compute_stop
+        Compute_stop:
+          target: VirtualMachine
+          activities:
+            - delegate: stop
+          on_success:
+            - FIPVirtualMachine_stop
+        FIPVirtualMachine_stop:
+          target: FIPVirtualMachine
+          activities:
+            - delegate: stop
