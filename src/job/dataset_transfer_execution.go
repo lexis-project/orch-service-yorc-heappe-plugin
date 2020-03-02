@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	scp "github.com/bramvdbogaerde/go-scp"
@@ -70,7 +71,7 @@ func (e *DatasetTransferExecution) ExecuteAsync(ctx context.Context) (*prov.Acti
 func (e *DatasetTransferExecution) Execute(ctx context.Context) error {
 
 	var err error
-	switch e.Operation.Name {
+	switch strings.ToLower(e.Operation.Name) {
 	case installOperation, "standard.create":
 		// Nothing to do
 	case uninstallOperation, "standard.delete":
