@@ -17,6 +17,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -152,7 +153,12 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 
 		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(fmt.Sprintf("job state:%+v", jobState))
 		// Error to be returned
-		err = errors.Errorf("job with ID: %d finished unsuccessfully with state: %q", actionData.jobID, jobState)
+		exitStatus := getJobExitStatus(jobInfo)
+		if exitStatus == "" {
+			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q", jobInfo.Name, actionData.jobID, jobState)
+		} else {
+			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q, exit status: %s", jobInfo.Name, actionData.jobID, jobState, exitStatus)
+		}
 	}
 
 	// If the job state is a final state, print job logs before printing the state change
@@ -276,6 +282,17 @@ func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 		strValue = jobStateFailed
 	}
 	return strValue
+}
+
+func getJobExitStatus(jobInfo heappe.SubmittedJobInfo) string {
+	var exitStatus string
+
+	re := regexp.MustCompile(`Exit_status: (\d+)`)
+	match := re.FindStringSubmatch(jobInfo.AllParameters)
+	if len(match) == 2 {
+		exitStatus = match[1]
+	}
+	return exitStatus
 }
 
 func displayFileType(fType int) string {
