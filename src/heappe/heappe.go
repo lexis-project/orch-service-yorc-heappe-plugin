@@ -33,6 +33,7 @@ const (
 	heappeDownloadPartsREST         = "/heappe/FileTransfer/DownloadPartsOfJobFilesFromCluster"
 	heappeGetFileTransferMethodREST = "/heappe/FileTransfer/GetFileTransferMethod"
 	heappeEndFileTransferREST       = "/heappe/FileTransfer/EndFileTransfer"
+	heappeDownloadFileREST          = "/heappe/FileTransfer/DownloadFileFromCluster"
 	heappeListChangedFilesREST      = "/heappe/FileTransfer/ListChangedFilesForJob"
 	heappeUserUsageReportREST       = "/heappe/JobReporting/GetUserResourceUsageReport"
 	heappeListAdaptorUserGroupsREST = "/heappe/JobReporting/ListAdaptorUserGroups"
@@ -56,6 +57,7 @@ type Client interface {
 	DownloadPartsOfJobFilesFromCluster(JobID int64, offsets []TaskFileOffset) ([]JobFileContent, error)
 	GetFileTransferMethod(jobID int64) (FileTransferMethod, error)
 	EndFileTransfer(jobID int64, ft FileTransferMethod) error
+	DownloadFileFromCluster(jobID int64, filePath string) (string, error)
 	ListChangedFilesForJob(jobID int64) ([]string, error)
 	ListAdaptorUserGroups() ([]AdaptorUserGroup, error)
 	GetUserResourceUsageReport(userID int64, startTime, endTime string) (*UserResourceUsageReport, error)
@@ -154,7 +156,7 @@ func (h *heappeClient) SubmitJob(jobID int64) error {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeSubmitJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to submit job")
+		err = errors.Wrapf(err, "Failed to submit job %d", jobID)
 	}
 
 	return err
@@ -180,7 +182,7 @@ func (h *heappeClient) CancelJob(jobID int64) error {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeCancelJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to cancel job")
+		err = errors.Wrapf(err, "Failed to cancel job %d", jobID)
 	}
 
 	return err
@@ -206,7 +208,7 @@ func (h *heappeClient) DeleteJob(jobID int64) error {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeDeleteJobREST, http.StatusOK, params, &response)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to delete job")
+		err = errors.Wrapf(err, "Failed to delete job %d", jobID)
 	}
 
 	return err
@@ -232,7 +234,8 @@ func (h *heappeClient) GetJobInfo(jobID int64) (SubmittedJobInfo, error) {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeJobInfoREST, http.StatusOK, params, &jobInfo)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to get job state")
+		err = errors.Wrapf(err, "Failed to get state of job %d", jobID)
+
 	}
 
 	return jobInfo, err
@@ -258,7 +261,7 @@ func (h *heappeClient) DownloadPartsOfJobFilesFromCluster(jobID int64, offsets [
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeDownloadPartsREST, http.StatusOK, params, &contents)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to download part of job outputs")
+		err = errors.Wrapf(err, "Failed to download part of job outputs for job %d", jobID)
 	}
 
 	return contents, err
@@ -282,7 +285,7 @@ func (h *heappeClient) GetFileTransferMethod(jobID int64) (FileTransferMethod, e
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeGetFileTransferMethodREST, http.StatusOK, params, &transferMethod)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to download part of job outputs")
+		err = errors.Wrapf(err, "Failed to get file transfer method for job %d", jobID)
 	}
 
 	return transferMethod, err
@@ -308,10 +311,36 @@ func (h *heappeClient) EndFileTransfer(jobID int64, ft FileTransferMethod) error
 	var result string
 	err := h.httpClient.doRequest(http.MethodPost, heappeEndFileTransferREST, http.StatusOK, params, &result)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to download part of job outputs")
+		err = errors.Wrapf(err, "Failed to end file transfer for job %d", jobID)
 	}
 
 	return err
+
+}
+
+func (h *heappeClient) DownloadFileFromCluster(jobID int64, filePath string) (string, error) {
+
+	var fContent string
+	if h.sessionID == "" {
+		var err error
+		h.sessionID, err = h.authenticate()
+		if err != nil {
+			return fContent, err
+		}
+	}
+
+	params := DownloadFileRESTParams{
+		SubmittedJobInfoID: jobID,
+		SessionCode:        h.sessionID,
+		RelativeFilePath:   filePath,
+	}
+
+	err := h.httpClient.doRequest(http.MethodPost, heappeDownloadFileREST, http.StatusOK, params, &fContent)
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to download file %s content for job %d", filePath, jobID)
+	}
+
+	return fContent, err
 
 }
 
@@ -333,7 +362,7 @@ func (h *heappeClient) ListChangedFilesForJob(jobID int64) ([]string, error) {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeListChangedFilesREST, http.StatusOK, params, &filenames)
 	if err != nil {
-		err = errors.Wrap(err, "Failed to download part of job outputs")
+		err = errors.Wrapf(err, "Failed to list changed files for job %d", jobID)
 	}
 
 	return filenames, err
@@ -385,7 +414,8 @@ func (h *heappeClient) GetUserResourceUsageReport(userID int64, startTime, endTi
 	err := h.httpClient.doRequest(http.MethodPost, heappeUserUsageReportREST, http.StatusOK, params, &report)
 	if err != nil {
 		log.Printf("Error calling HEAppE API %s: %s", heappeUserUsageReportREST, err.Error())
-		err = errors.Wrap(err, "Failed to get resources usage report")
+		err = errors.Wrapf(err, "Failed to get resources usage report for user %d", userID)
+
 	}
 
 	return &report, err
@@ -430,7 +460,7 @@ func (h *heappeClient) GetCurrentClusterNodeUsage(nodeID int64) (ClusterNodeUsag
 	err = h.httpClient.doRequest(http.MethodPost, heappeNodeUsageREST, http.StatusOK, params, &result)
 	if err != nil {
 		log.Printf("Error calling HEAppE API %s: %s", heappeNodeUsageREST, err.Error())
-		err = errors.Wrap(err, "Failed to get list of users")
+		err = errors.Wrapf(err, "Failed to get list of users on node %d", nodeID)
 	}
 
 	return result, err

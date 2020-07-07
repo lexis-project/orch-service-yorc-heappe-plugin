@@ -39,7 +39,10 @@ func (de *delegateExecutor) ExecDelegate(ctx context.Context, cfg config.Configu
 
 	// Emit events and logs on instance status change
 	for _, instanceName := range instances {
-		deployments.SetInstanceStateWithContextualLogs(ctx, deploymentID, nodeName, instanceName, tosca.NodeStateCreating)
+		err = deployments.SetInstanceStateWithContextualLogs(ctx, deploymentID, nodeName, instanceName, tosca.NodeStateCreating)
+		if err != nil {
+			return err
+		}
 	}
 
 	operation := prov.Operation{
@@ -56,7 +59,10 @@ func (de *delegateExecutor) ExecDelegate(ctx context.Context, cfg config.Configu
 	}
 
 	for _, instanceName := range instances {
-		deployments.SetInstanceStateWithContextualLogs(ctx, deploymentID, nodeName, instanceName, tosca.NodeStateStarted)
+		err = deployments.SetInstanceStateWithContextualLogs(ctx, deploymentID, nodeName, instanceName, tosca.NodeStateStarted)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

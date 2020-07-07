@@ -29,8 +29,7 @@ func main() {
 	// - A DelegateExecutor for some TOSCA component types
 	// - An OperationExecutor for some TOSCA artifacts types
 	// - An InfrastructureUsageCollector for specific infrastructures to be monitored
-	var servConfig *plugin.ServeOpts
-	servConfig = new(plugin.ServeOpts)
+	servConfig := new(plugin.ServeOpts)
 
 	// Add TOSCA Definitions contained in the def variable.
 	// These defintions are provided in a yaml file heappe-types.yaml
@@ -60,7 +59,7 @@ func main() {
 	}
 
 	// Set ActionFunc that implements an ActionOperator for HEAppE jobs
-	servConfig.ActionTypes = []string{"heappe-job-monitoring"}
+	servConfig.ActionTypes = []string{"heappe-job-monitoring", "heappe-filecontent-monitoring"}
 	servConfig.ActionFunc = func() prov.ActionOperator {
 		return new(job.ActionOperator)
 	}

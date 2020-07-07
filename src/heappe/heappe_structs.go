@@ -203,6 +203,14 @@ type EndFileTransferRESTParams struct {
 	SessionCode        string             `json:"sessionCode"`
 }
 
+// DownloadFileRESTParams holds HEAppE parameters for the REST API
+// allowing to download a file
+type DownloadFileRESTParams struct {
+	SubmittedJobInfoID int64  `json:"submittedJobInfoId"`
+	RelativeFilePath   string `json:"relativeFilePath"`
+	SessionCode        string `json:"sessionCode"`
+}
+
 // ListAdaptorUserGroupsRESTParams holds parameters used in the REST API call to
 // get details on users
 type ListAdaptorUserGroupsRESTParams struct {

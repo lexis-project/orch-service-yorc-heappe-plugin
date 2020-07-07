@@ -165,6 +165,9 @@ func getUserInfraUsage(client heappe.Client, locationProps config.DynamicMap, pa
 		return nil, errors.Errorf("Missing parameter %q in query to get infrastructure usage from a given start time", StartTimeQueryParameter)
 	}
 	report, err := client.GetUserResourceUsageReport(userID, startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
 
 	return json.Marshal(report)
 }
