@@ -33,13 +33,14 @@ import (
 )
 
 const (
-	actionDataSessionID       = "sessionID"
-	jobStatePending           = "PENDING"
-	jobStateRunning           = "RUNNING"
-	jobStateCompleted         = "COMPLETED"
-	jobStateFailed            = "FAILED"
-	jobStateCanceled          = "CANCELED"
-	actionDataOffsetKeyFormat = "%d_%d_%d"
+	actionDataSessionID        = "sessionID"
+	jobStatePending            = "PENDING"
+	jobStateRunning            = "RUNNING"
+	jobStateCompleted          = "COMPLETED"
+	jobStateFailed             = "FAILED"
+	jobStateCanceled           = "CANCELED"
+	actionDataOffsetKeyFormat  = "%d_%d_%d"
+	fileContentConsulAttribute = "filecontent"
 )
 
 type fileType int
@@ -62,6 +63,7 @@ type actionData struct {
 	taskID    string
 	nodeName  string
 	sessionID string
+	filePath  string
 }
 
 // ExecAction allows to execute and action
@@ -77,6 +79,17 @@ func (o *ActionOperator) ExecAction(ctx context.Context, cfg config.Configuratio
 
 		return deregister, nil
 	}
+
+	if action.ActionType == "heappe-filecontent-monitoring" {
+		deregister, err := o.getFileContent(ctx, cfg, deploymentID, action)
+		if err != nil {
+			// action scheduling needs to be unregistered
+			return true, err
+		}
+
+		return deregister, nil
+	}
+
 	return true, errors.Errorf("Unsupported actionType %q", action.ActionType)
 }
 
@@ -248,6 +261,122 @@ func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.
 	return err
 }
 
+func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configuration, deploymentID string, action *prov.Action) (bool, error) {
+	var (
+		err error
+		ok  bool
+	)
+
+	actionData := &actionData{}
+	// Check nodeName
+	actionData.nodeName, ok = action.Data["nodeName"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information nodeName for actionType:%q", action.ActionType)
+	}
+	// Check jobID
+	jobIDstr, ok := action.Data["jobID"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information jobID for actionType:%q", action.ActionType)
+	}
+	actionData.jobID, err = strconv.ParseInt(jobIDstr, 10, 64)
+	if err != nil {
+		return true, errors.Wrapf(err, "Unexpected Job ID value %q for deployment %s node %s", jobIDstr, deploymentID, actionData.nodeName)
+	}
+
+	// Check taskID
+	actionData.taskID, ok = action.Data["taskID"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information taskID for actionType:%q", action.ActionType)
+	}
+
+	// Check filePath
+	actionData.filePath, ok = action.Data["filePath"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information filePath for actionType:%q", action.ActionType)
+	}
+
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName)
+	if err != nil {
+		return true, err
+	}
+
+	// Set session ID if defined, else a new session will be created
+	actionData.sessionID, ok = action.Data[actionDataSessionID]
+	if ok && actionData.sessionID != "" {
+		heappeClient.SetSessionID(actionData.sessionID)
+	}
+
+	jobInfo, err := heappeClient.GetJobInfo(actionData.jobID)
+	if err != nil {
+		return true, err
+	}
+
+	if actionData.sessionID == "" {
+		// Storing the session ID for next job state check
+		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, heappeClient.GetSessionID())
+		if err != nil {
+			return true, errors.Wrapf(err, "failed to update action data for deployment %s node %s", deploymentID, actionData.nodeName)
+		}
+	}
+
+	jobState := getJobState(jobInfo)
+	if jobState == jobStatePending {
+		// Job not yet running, no need to check for files created yet
+		return false, err
+	}
+	changedFiles, err := heappeClient.ListChangedFilesForJob(actionData.jobID)
+	if err != nil {
+		return true, err
+	}
+
+	var foundFile bool
+	for _, filePath := range changedFiles {
+		if filePath == actionData.filePath {
+			foundFile = true
+			break
+		}
+	}
+
+	if !foundFile {
+		// Not yet produced by the job, ending this iteration,
+		// except if the job status is done, in which case no new file will be
+		// produced and we didn't find the expected file, so ending with a failure
+		if jobState == jobStateCompleted || jobState == jobStateFailed ||
+			jobState == jobStateCanceled {
+
+			err = deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateFailed)
+			if err != nil {
+				log.Printf("Failed to set Job %s state %s: %s", actionData.nodeName, jobState, err.Error())
+			} else {
+				err = errors.Errorf("Failed to find file %s expected to be produced by job ID %d", actionData.filePath, actionData.jobID)
+			}
+
+			return true, err
+		} else {
+			// Ending this iteration, we'll check again if the file is there next time
+			return false, err
+		}
+	}
+
+	fContent, err := heappeClient.DownloadFileFromCluster(actionData.jobID, actionData.filePath)
+	if err != nil {
+		return true, err
+	}
+
+	// Store the content
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+		fileContentConsulAttribute, fContent)
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to store file content for deployment %s node %s", deploymentID, actionData.nodeName)
+		return true, err
+	}
+
+	// Work done, update this job state to completed
+	err = deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateCompleted)
+
+	return true, err
+}
+
 func getOffset(jobID, taskID int64, fileType int, action *prov.Action) (int64, error) {
 
 	offsetKey := getActionDataOffsetKey(jobID, taskID, fileType)
@@ -267,18 +396,18 @@ func getActionDataOffsetKey(jobID, taskID int64, fileType int) string {
 func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 	var strValue string
 	switch jobInfo.State {
-	case 0, 1, 2:
+	case 0, 1, 2, 4:
 		strValue = jobStatePending
-	case 3:
+	case 8:
 		strValue = jobStateRunning
-	case 4:
+	case 16:
 		strValue = jobStateCompleted
-	case 5:
+	case 32:
 		strValue = jobStateFailed
-	case 6:
+	case 64:
 		strValue = jobStateFailed // HEAppE state canceled
 	default:
-		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, strValue)
+		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, jobInfo.State)
 		strValue = jobStateFailed
 	}
 	return strValue

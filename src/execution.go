@@ -35,6 +35,7 @@ const (
 	heappeJobType                         = "org.heappe.nodes.Job"
 	heappeSendDatasetType                 = "org.heappe.nodes.Dataset"
 	heappeReceiveDatasetType              = "org.heappe.nodes.Results"
+	heappeWaitFileGetContent              = "org.heappe.nodes.WaitFileAndGetContentJob"
 )
 
 // Execution is the interface holding functions to execute an operation
@@ -59,22 +60,23 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		return exec, err
 	}
 
-	if isJob {
-		locationMgr, err := locations.GetManager(cfg)
-		if err != nil {
-			return nil, err
-		}
-		locationProps, err := locationMgr.GetLocationPropertiesForNode(ctx,
-			deploymentID, nodeName, heappeInfrastructureType)
-		if err != nil {
-			return nil, err
-		}
+	locationMgr, err := locations.GetManager(cfg)
+	if err != nil {
+		return nil, err
+	}
+	locationProps, err := locationMgr.GetLocationPropertiesForNode(ctx,
+		deploymentID, nodeName, heappeInfrastructureType)
+	if err != nil {
+		return nil, err
+	}
 
-		monitoringTimeInterval := locationProps.GetDuration(locationJobMonitoringTimeInterval)
-		if monitoringTimeInterval <= 0 {
-			// Default value
-			monitoringTimeInterval = locationDefaultMonitoringTimeInterval
-		}
+	monitoringTimeInterval := locationProps.GetDuration(locationJobMonitoringTimeInterval)
+	if monitoringTimeInterval <= 0 {
+		// Default value
+		monitoringTimeInterval = locationDefaultMonitoringTimeInterval
+	}
+
+	if isJob {
 		exec = &job.Execution{
 			KV:                     kv,
 			Cfg:                    cfg,
@@ -89,6 +91,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	}
 
 	isReceiveDataset := false
+	isWaitFileGetContent := false
 	isSendDataset, err := deployments.IsNodeDerivedFrom(ctx, deploymentID, nodeName, heappeSendDatasetType)
 	if err != nil {
 		return exec, errors.Wrapf(err, "Could not get type for deployment %s node %s", deploymentID, nodeName)
@@ -98,20 +101,30 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		if err != nil {
 			return exec, errors.Wrapf(err, "Could not get type for deployment %s node %s", deploymentID, nodeName)
 		}
+
+		if !isReceiveDataset {
+			isWaitFileGetContent, err = deployments.IsNodeDerivedFrom(ctx, deploymentID, nodeName, heappeWaitFileGetContent)
+			if err != nil {
+				return exec, errors.Wrapf(err, "Could not get type for deployment %s node %s", deploymentID, nodeName)
+			}
+
+		}
+
 	}
 
-	if !isSendDataset && !isReceiveDataset {
-		return exec, errors.Errorf("operation %q supported only for nodes derived from %q, %q or %q",
-			operation, heappeJobType, heappeSendDatasetType, heappeReceiveDatasetType)
+	if !isSendDataset && !isReceiveDataset && !isWaitFileGetContent {
+		return exec, errors.Errorf("operation %q supported only for nodes derived from %q, %q, %q or %q",
+			operation, heappeJobType, heappeSendDatasetType, heappeReceiveDatasetType, heappeWaitFileGetContent)
 	}
 
 	exec = &job.DatasetTransferExecution{
-		KV:           kv,
-		Cfg:          cfg,
-		DeploymentID: deploymentID,
-		TaskID:       taskID,
-		NodeName:     nodeName,
-		Operation:    operation,
+		KV:                     kv,
+		Cfg:                    cfg,
+		DeploymentID:           deploymentID,
+		TaskID:                 taskID,
+		NodeName:               nodeName,
+		Operation:              operation,
+		MonitoringTimeInterval: monitoringTimeInterval,
 	}
 
 	return exec, exec.ResolveExecution(ctx)

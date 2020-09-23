@@ -35,6 +35,7 @@ import (
 	"github.com/ystia/yorc/v4/log"
 	"github.com/ystia/yorc/v4/prov"
 	"github.com/ystia/yorc/v4/prov/operations"
+	"github.com/ystia/yorc/v4/tosca"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -43,27 +44,53 @@ const (
 	getResultsOperation    = "custom.getresults"
 	zipDatasetArtifactName = "zip_dataset"
 	jobIDEnvVar            = "JOB_ID"
+	filePathEnvVar         = "FILE_PATH"
 	zipResultAttribute     = "zip_result"
 )
 
 // DatasetTransferExecution holds properties of a data transfer operation
 type DatasetTransferExecution struct {
-	KV             *api.KV
-	Cfg            config.Configuration
-	DeploymentID   string
-	TaskID         string
-	NodeName       string
-	Operation      prov.Operation
-	OverlayPath    string
-	Artifacts      map[string]string
-	EnvInputs      []*operations.EnvInput
-	VarInputsNames []string
+	KV                     *api.KV
+	Cfg                    config.Configuration
+	DeploymentID           string
+	TaskID                 string
+	NodeName               string
+	Operation              prov.Operation
+	OverlayPath            string
+	Artifacts              map[string]string
+	MonitoringTimeInterval time.Duration
+	EnvInputs              []*operations.EnvInput
+	VarInputsNames         []string
 }
 
-// ExecuteAsync executes an asynchronous operation - not supported here
+// ExecuteAsync executes an asynchronous operation - supported to wait for a file and get its content
 func (e *DatasetTransferExecution) ExecuteAsync(ctx context.Context) (*prov.Action, time.Duration, error) {
 
-	return nil, 0, errors.Errorf("Unsupported asynchronous operation %q for dataset transfer", e.Operation.Name)
+	if strings.ToLower(e.Operation.Name) != tosca.RunnableRunOperationName {
+		return nil, 0, errors.Errorf("Unsupported asynchronous operation %q", e.Operation.Name)
+	}
+
+	jobIDStr := e.getValueFromEnvInputs(jobIDEnvVar)
+	if jobIDStr == "" {
+		return nil, 0, errors.Errorf("Failed to get associated job ID")
+	}
+	_, err := strconv.ParseInt(jobIDStr, 10, 64)
+	if err != nil {
+		err = errors.Wrapf(err, "Unexpected Job ID value %q for deployment %s node %s",
+			jobIDStr, e.DeploymentID, e.NodeName)
+		return nil, 0, err
+	}
+
+	data := make(map[string]string)
+	data["filePath"] = e.getValueFromEnvInputs(filePathEnvVar)
+	if data["filePath"] == "" {
+		return nil, 0, errors.Errorf("Failed to get file path property")
+	}
+	data["taskID"] = e.TaskID
+	data["nodeName"] = e.NodeName
+	data["jobID"] = jobIDStr
+
+	return &prov.Action{ActionType: "heappe-filecontent-monitoring", Data: data}, e.MonitoringTimeInterval, err
 
 }
 
@@ -92,6 +119,12 @@ func (e *DatasetTransferExecution) Execute(ctx context.Context) error {
 			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
 				"Getting results from job %q failed, error %s", e.NodeName, err.Error())
 		}
+	case tosca.RunnableSubmitOperationName:
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Submitting Job %q", e.NodeName)
+	case tosca.RunnableCancelOperationName:
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Canceling Job %q", e.NodeName)
 	default:
 		err = errors.Errorf("Unsupported operation %q on dataset transfer", e.Operation.Name)
 	}

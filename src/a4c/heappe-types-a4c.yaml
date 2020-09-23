@@ -214,6 +214,61 @@ node_types:
     derived_from: org.heappe.nodes.pub.Job
     description: >
       HEAppE Job
+  org.heappe.nodes.pub.WaitFileAndGetContentJob:
+    derived_from: tosca.nodes.Root
+    abstract: true
+    description: >
+      Wait for the creation of a file by a given job and get its content(abstract)
+    properties:
+      file_path:
+        description: Path to the file as reported by the Job list_changed_files operation
+        type: string
+        required: true
+    attributes:
+      filecontent:
+        type: string
+        description: Content of the file
+    capabilities:
+      filecontent:
+        type: org.heappe.capabilities.FileContent
+    requirements:
+      - job:
+          capability: org.heappe.capabilities.HeappeJob
+          node: org.heappe.nodes.pub.Job
+          relationship: org.heappe.relationships.FileContent
+          occurrences: [1, 1]
+    tags:
+      icon: /images/heappejob.png
+    interfaces:
+      Standard:
+        create:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        delete:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+      tosca.interfaces.node.lifecycle.Runnable:
+        submit:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        run:
+          inputs:
+            JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
+            FILE_PATH: { get_property: [SELF, file_path] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+        cancel:
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
+  org.heappe.nodes.WaitFileAndGetContentJob:
+    derived_from: org.heappe.nodes.pub.WaitFileAndGetContentJob
+    description: >
+      Wait for the creation of files from a given job
   org.heappe.nodes.pub.Dataset:
     derived_from: tosca.nodes.Root
     abstract: true
@@ -318,15 +373,21 @@ node_types:
     interfaces:
       Standard:
         create:
-          implementation: playbooks/noop.yaml
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
         delete:
-          implementation: playbooks/noop.yaml
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
       Custom:
         copyResults:
           inputs:
             ZIP_SRC: { get_attribute: [REQ_TARGET, job_results, zip_result] }
             DEST_DIR: { get_property: [SELF, destination_dir] }
-          implementation: playbooks/copy.yaml
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
     tags:
       icon: /images/heappecopy.png
   org.heappe.nodes.CopyResults:
@@ -345,6 +406,14 @@ capability_types:
     description: >
       A capability fulfilling requirements of a node requiring to be
       associated with HEAppE Job Results.
+  org.heappe.capabilities.FileContent:
+    derived_from: tosca.capabilities.Root
+    description: >
+      A capability providing the content of a file produced by a job.
+    attributes:
+      filecontent:
+        type: string
+        description: File content
 relationship_types:
   org.heappe.relationships.DependsOnJob:
     derived_from: tosca.relationships.DependsOn
@@ -358,3 +427,7 @@ relationship_types:
     derived_from: tosca.relationships.DependsOn
     description: Relationship between a component and a HEAppE job Results
     valid_target_types: [ org.heappe.nodes.pub.Results ]
+  org.heappe.relationships.FileContent:
+    derived_from: tosca.relationships.DependsOn
+    valid_target_types: [ org.heappe.nodes.pub.Job ]
+
