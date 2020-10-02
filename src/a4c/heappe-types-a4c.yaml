@@ -39,6 +39,20 @@ data_types:
         description: Task name
         type: string
         required: true
+      ClusterNodeTypeId:
+        description: Cluter node type ID
+        type: int
+        required: true
+      CommandTemplateId:
+        description: Command template ID
+        type: int
+        required: true
+      TemplateParameterValues:
+        description: Command template parameters
+        type: list
+        entry_schema:
+          type: org.heappe.types.CommandTemplateParameterValue
+        required: false
       MinCores:
         description: Minimum number of cores required
         type: integer
@@ -53,6 +67,12 @@ data_types:
         description: Maximum time for the task to run (in seconds)
         type: integer
         default: 600
+        required: false
+      EnvironmentVariables:
+        description: Environment variables
+        type: list
+        entry_schema:
+          type: org.heappe.types.EnvironmentVariable
         required: false
       RequiredNodes:
         description: Required nodes
@@ -99,26 +119,6 @@ data_types:
       ClusterTaskSubdirectory:
         type: string
         required: false
-      ClusterNodeTypeId:
-        description: Cluter node type ID
-        type: int
-        required: true
-      CommandTemplateId:
-        description: Command template ID
-        type: int
-        required: true
-      EnvironmentVariables:
-        description: Environment variables
-        type: list
-        entry_schema:
-          type: org.heappe.types.EnvironmentVariable
-        required: false
-      TemplateParameterValues:
-        description: Command template parameters
-        type: list
-        entry_schema:
-          type: org.heappe.types.CommandTemplateParameterValue
-        required: false
   org.heappe.types.JobSpecification:
     derived_from: tosca.datatypes.Root
     properties:
@@ -135,6 +135,17 @@ data_types:
         type: integer
         default: 36000
         required: false
+      ClusterId :
+        description: Cluster ID
+        type: integer
+        required: true
+        required: false
+      Tasks :
+        description: Tasks (at leat one task needs to be defined)
+        type: list
+        entry_schema:
+          type: org.heappe.types.TaskSpecification
+        required: true
       NotificationEmail:
         description: Notification email
         type: string
@@ -158,17 +169,6 @@ data_types:
         type: boolean
         default: false
         required: false
-      ClusterId :
-        description: Cluster ID
-        type: integer
-        required: true
-        required: false
-      Tasks :
-        description: Tasks (at leat one task needs to be defined)
-        type: list
-        entry_schema:
-          type: org.heappe.types.TaskSpecification
-        required: true
   org.heappe.types.FileTransfer:
     derived_from: tosca.datatypes.Root
     properties:
