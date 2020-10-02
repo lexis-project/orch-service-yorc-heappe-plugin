@@ -33,8 +33,8 @@ const (
 
 // PasswordCredentials holds user/password to perform a basic authentication
 type PasswordCredentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string
+	Password string
 }
 
 // Authentication parameters
@@ -44,42 +44,54 @@ type Authentication struct {
 
 // CommandTemplateParameterValue holds a command template parameter
 type CommandTemplateParameterValue struct {
-	CommandParameterIdentifier string `json:"commandParameterIdentifier"`
-	ParameterValue             string `json:"parameterValue"`
+	CommandParameterIdentifier string
+	ParameterValue             string
 }
 
 // EnvironmentVariable holds an environment variable definition
 type EnvironmentVariable struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name  string
+	Value string
 }
 
 // TaskSpecification holds task properties
 type TaskSpecification struct {
-	Name                    string                          `json:"name"`
-	CommandTemplateID       int                             `json:"commandTemplateId"`
-	TemplateParameterValues []CommandTemplateParameterValue `json:"templateParameterValues,omitempty"`
-	MinCores                int                             `json:"minCores"`
-	MaxCores                int                             `json:"maxCores"`
-	WalltimeLimit           int                             `json:"walltimeLimit"`
-	StandardOutputFile      string                          `json:"standardOutputFile"`
-	StandardErrorFile       string                          `json:"standardErrorFile"`
-	ProgressFile            string                          `json:"progressFile"`
-	LogFile                 string                          `json:"logFile"`
-	EnvironmentVariables    []EnvironmentVariable           `json:"environmentVariables,omitempty"`
+	Name                    string
+	MinCores                int
+	MaxCores                int
+	WalltimeLimit           int
+	RequiredNodes           string
+	Priority                int
+	JobArrays               string
+	IsExclusive             bool
+	IsRerunnable            bool
+	StandardInputFile       string
+	StandardOutputFile      string
+	StandardErrorFile       string
+	ProgressFile            string
+	LogFile                 string
+	ClusterTaskSubdirectory string
+	ClusterNodeTypeID       int                   `json:"ClusterNodeTypeId"`
+	CommandTemplateID       int                   `json:"CommandTemplateId"`
+	EnvironmentVariables    []EnvironmentVariable `json:"EnvironmentVariables,omitempty"`
+	// TODO: DependsOn
+	TemplateParameterValues []CommandTemplateParameterValue `json:"TemplateParameterValues,omitempty"`
 }
 
 // JobSpecification holds job properties
 type JobSpecification struct {
-	Name              string              `json:"name"`
-	Project           string              `json:"project"`
-	ClusterNodeTypeID int                 `json:"clusterNodeTypeId"`
-	Tasks             []TaskSpecification `json:"tasks"`
-	Priority          int                 `json:"priority"`
-	MinCores          int                 `json:"minCores"`
-	MaxCores          int                 `json:"maxCores"`
-	WaitingLimit      int                 `json:"waitingLimit"`
-	WalltimeLimit     int                 `json:"walltimeLimit"`
+	Name                 string
+	Project              string
+	WaitingLimit         int
+	NotificationEmail    string
+	PhoneNumber          string
+	NotifyOnAbort        bool
+	NotifyOnFinish       bool
+	NotifyOnStart        bool
+	ClusterID            int                   `json:"ClusterId"`
+	FileTransferMethodID int                   `json:"FileTransferMethodId"`
+	EnvironmentVariables []EnvironmentVariable `json:"EnvironmentVariables,omitempty"`
+	Tasks                []TaskSpecification
 }
 
 // JobCreateRESTParams holds HEAppE REST API job creation parameters
@@ -102,65 +114,64 @@ type JobInfoRESTParams struct {
 
 // TemplateParameter holds template parameters description in a job
 type TemplateParameter struct {
-	Identifier  string `json:"identifier"`
-	Description string `json:"description"`
+	Identifier  string
+	Description string
 }
 
 // CommandTemplate holds a command template description in a job
 type CommandTemplate struct {
-	ID                 int64               `json:"id"`
-	Name               string              `json:"name"`
-	Description        string              `json:"description"`
-	Code               string              `json:"code"`
-	TemplateParameters []TemplateParameter `json:"templateParameters"`
+	ID                 int64 `json:"Id"`
+	Name               string
+	Description        string
+	Code               string
+	TemplateParameters []TemplateParameter
 }
 
 // ClusterNodeType holds a node description in a job
 type ClusterNodeType struct {
-	ID               int64             `json:"id"`
-	Name             string            `json:"name"`
-	Description      string            `json:"description"`
-	NumberOfNodes    int               `json:"numberOfNodes"`
-	CoresPerNode     int               `json:"coresPerNode"`
-	MaxWalltime      int               `json:"maxWalltime"`
-	CommandTemplates []CommandTemplate `json:"commandTemplates"`
+	ID               int64 `json:"Id"`
+	Name             string
+	Description      string
+	NumberOfNodes    int
+	CoresPerNode     int
+	MaxWalltime      int
+	CommandTemplates []CommandTemplate
 }
 
 // SubmittedTaskInfo holds a task description in a job
 type SubmittedTaskInfo struct {
-	ID               int64   `json:"id"`
-	Name             string  `json:"name"`
-	State            int     `json:"state"`
-	AllocatedTime    float64 `json:"allocatedTime,omitempty"`
-	AllocatedCoreIds string  `json:"allocatedCoreIds,omitempty"`
-	StartTime        string  `json:"startTime,omitempty"`
-	EndTime          string  `json:"endTime,omitempty"`
-	ErrorMessage     string  `json:"errorMessage,omitempty"`
-	AllParameters    string  `json:"allParameters,omitempty"`
+	ID                int64 `json:"Id"`
+	Name              string
+	State             int
+	Priority          int
+	AllocatedTime     float64
+	AllocatedCoreIds  string
+	StartTime         string
+	EndTime           string
+	NodeType          ClusterNodeType
+	ErrorMessage      string
+	CpuHyperThreading bool
 }
 
 // SubmittedJobInfo holds the response to a job creation/submission
 type SubmittedJobInfo struct {
-	ID                 int64               `json:"id"`
-	Name               string              `json:"name"`
-	State              int                 `json:"state"`
-	Priority           int                 `json:"priority"`
-	Project            string              `json:"project"`
-	CreationTime       string              `json:"creationTime"`
-	SubmitTime         string              `json:"submitTime,omitempty"`
-	StartTime          string              `json:"startTime,omitempty"`
-	EndTime            string              `json:"endTime,omitempty"`
-	TotalAllocatedTime float64             `json:"totalAllocatedTime,omitempty"`
-	AllParameters      string              `json:"allParameters,omitempty"`
-	NodeType           ClusterNodeType     `json:"nodeType"`
-	Tasks              []SubmittedTaskInfo `json:"tasks"`
+	ID                 int64 `json:"Id"`
+	Name               string
+	State              int
+	Project            string
+	CreationTime       string
+	SubmitTime         string
+	StartTime          string
+	EndTime            string
+	TotalAllocatedTime float64
+	Tasks              []SubmittedTaskInfo
 }
 
 // TaskFileOffset holds the offset to a file of a given task
 type TaskFileOffset struct {
-	SubmittedTaskInfoID int64 `json:"submittedTaskInfoId"`
-	FileType            int   `json:"fileType"`
-	Offset              int64 `json:"offset"`
+	SubmittedTaskInfoID int64 `json:"SubmittedTaskInfoId"`
+	FileType            int
+	Offset              int64
 }
 
 // DownloadPartsOfJobFilesRESTParams holds HEAppE parameters for the REST API
@@ -173,26 +184,26 @@ type DownloadPartsOfJobFilesRESTParams struct {
 
 // JobFileContent holds the response to a partial download of job files
 type JobFileContent struct {
-	Content             string `json:"content"`
-	RelativePath        string `json:"relativePath"`
-	Offset              int64  `json:"offset"`
-	FileType            int    `json:"fileType"`
-	SubmittedTaskInfoID int64  `json:"submittedTaskInfoId"`
+	Content             string
+	RelativePath        string
+	Offset              int64
+	FileType            int
+	SubmittedTaskInfoID int64 `json:"SubmittedTaskInfoId"`
 }
 
 // AsymmetricKeyCredentials hold credentials used to transfer files to the HPC cluster
 type AsymmetricKeyCredentials struct {
-	Username   string `json:"username"`
-	PrivateKey string `json:"privateKey"`
-	PublicKey  string `json:"publicKey"`
+	Username   string
+	PrivateKey string
+	PublicKey  string
 }
 
 // FileTransferMethod holds properties allowing to transfer files to the HPC cluster
 type FileTransferMethod struct {
-	ServerHostname string                   `json:"serverHostname"`
-	SharedBasepath string                   `json:"sharedBasepath"`
-	Protocol       FileTransferProtocol     `json:"protocol"`
-	Credentials    AsymmetricKeyCredentials `json:"credentials"`
+	ServerHostname string
+	SharedBasepath string
+	Protocol       FileTransferProtocol
+	Credentials    AsymmetricKeyCredentials
 }
 
 // EndFileTransferRESTParams holds parameters used in the REST API call to notify
@@ -219,54 +230,45 @@ type ListAdaptorUserGroupsRESTParams struct {
 
 // AdaptorUser hold user name and id properties
 type AdaptorUser struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
+	ID       int64 `json:"Id"`
+	Username string
 }
 
 // AdaptorUserGroup holds user properties
 type AdaptorUserGroup struct {
-	ID               int64         `json:"id"`
-	Name             string        `json:"name"`
-	Description      string        `json:"description"`
-	AccountingString string        `json:"accountingString"`
-	Users            []AdaptorUser `json:"users"`
+	ID               int64 `json:"Id"`
+	Name             string
+	Description      string
+	AccountingString string
+	Users            []AdaptorUser
 }
 
 // SubmittedJobInfoUsageReport holds the description of resources used for a job
 type SubmittedJobInfoUsageReport struct {
-	ID                  int64   `json:"id"`
-	Name                string  `json:"name"`
-	State               int     `json:"state"`
-	Priority            int     `json:"priority"`
-	Project             string  `json:"project"`
-	CommandTemplateID   int64   `json:"commandTemplateId"`
-	CreationTime        string  `json:"creationTime"`
-	SubmitTime          string  `json:"submitTime"`
-	StartTime           string  `json:"startTime"`
-	EndTime             string  `json:"endTime"`
-	TotalAllocatedTime  float64 `json:"totalAllocatedTime,omitempty"`
-	AllParameters       string  `json:"allParameters"`
-	TotalCorehoursUsage float64 `json:"totalCorehoursUsage,omitempty"`
+	ID                  int64 `json:"Id"`
+	Name                string
+	State               int
+	Project             string
+	CommandTemplateID   int64 `json:"CommandTemplateId"`
+	CreationTime        string
+	SubmitTime          string
+	StartTime           string
+	EndTime             string
+	TotalAllocatedTime  float64
+	TotalCorehoursUsage float64
 }
 
 // NodeTypeAggregatedUsage hold usage for a cluster node type
 type NodeTypeAggregatedUsage struct {
-	ClusterNodeType     ClusterNodeType               `json:"clusterNodeType"`
-	SubmittedJobs       []SubmittedJobInfoUsageReport `json:"submittedJobs"`
-	TotalCorehoursUsage float64                       `json:"totalCorehoursUsage,omitempty"`
-}
-
-// UserAggregatedUsage holds resources usage for a user
-type UserAggregatedUsage struct {
-	User                AdaptorUser               `json:"user"`
-	NodeTypeReports     []NodeTypeAggregatedUsage `json:"nodeTypeReports"`
-	TotalCorehoursUsage float64                   `json:"totalCorehoursUsage,omitempty"`
+	ClusterNodeType     ClusterNodeType
+	SubmittedJobs       []SubmittedJobInfoUsageReport
+	TotalCorehoursUsage float64
 }
 
 // UserResourceUsageRESTParams holds parameters used in the REST API call to
 // get resources usage report for a user
 type UserResourceUsageRESTParams struct {
-	UserID      int64  `json:"userID"`
+	UserID      int64  `json:"userId"`
 	StartTime   string `json:"startTime"`
 	EndTime     string `json:"endTime"`
 	SessionCode string `json:"sessionCode"`
@@ -274,26 +276,26 @@ type UserResourceUsageRESTParams struct {
 
 // UserResourceUsageReport holds a report of resources by a user for a given time frame
 type UserResourceUsageReport struct {
-	User                AdaptorUser               `json:"user"`
-	NodeTypeReports     []NodeTypeAggregatedUsage `json:"nodeTypeReports"`
-	StartTime           string                    `json:"startTime"`
-	EndTime             string                    `json:"endTime"`
-	TotalCorehoursUsage float64                   `json:"totalCorehoursUsage,omitempty"`
+	User                AdaptorUser
+	NodeTypeReports     []NodeTypeAggregatedUsage
+	StartTime           string
+	EndTime             string
+	TotalCorehoursUsage float64
 }
 
 // ClusterInfo holds info on clusters managed by HEAppE
 type ClusterInfo struct {
-	ID          int64             `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	NodeTypes   []ClusterNodeType `json:"nodeTypes"`
+	ID          int64 `json:"Id"`
+	Name        string
+	Description string
+	NodeTypes   []ClusterNodeType
 }
 
 // ClusterNodeUsage holds usage details for a given node of a cluster
 type ClusterNodeUsage struct {
-	NodeType         ClusterNodeType `json:"nodeType"`
-	NodesUsed        int             `json:"nodesUsed"`
-	CoresUsedPerNode []int           `json:"coresUsedPerNode"`
+	NodeType         ClusterNodeType
+	NodesUsed        int
+	CoresUsedPerNode []int
 }
 
 // ClusterNodeUsageRESTParams holds parameters used in the REST API call to

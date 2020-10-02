@@ -379,34 +379,59 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 	var jobSpec heappe.JobSpecification
 	var err error
 
-	jobSpec.Name, err = deployments.GetStringNodePropertyValue(ctx, e.DeploymentID,
-		e.NodeName, jobSpecificationProperty, "name")
-	if err != nil {
-		return jobSpec, err
+	var stringPropNames = []struct {
+		field    *string
+		propName string
+	}{
+		{field: &(jobSpec.Name), propName: "Name"},
+		{field: &(jobSpec.Project), propName: "Project"},
+		{field: &(jobSpec.NotificationEmail), propName: "NotificationEmail"},
+		{field: &(jobSpec.NotificationEmail), propName: "PhoneNumber"},
 	}
 
-	jobSpec.Project, err = deployments.GetStringNodePropertyValue(ctx, e.DeploymentID,
-		e.NodeName, jobSpecificationProperty, "project")
-	if err != nil {
-		return jobSpec, err
+	for _, stringPropName := range stringPropNames {
+		*(stringPropName.field), err = deployments.GetStringNodePropertyValue(ctx, e.DeploymentID,
+			e.NodeName, jobSpecificationProperty, stringPropName.propName)
+		if err != nil {
+			return jobSpec, err
+		}
 	}
 
-	var fieldPropNames = []struct {
+	var intPropNames = []struct {
 		field    *int
 		propName string
 	}{
-		{field: &(jobSpec.ClusterNodeTypeID), propName: "clusterNodeTypeId"},
-		{field: &(jobSpec.Priority), propName: "priority"},
-		{field: &(jobSpec.MinCores), propName: "minCores"},
-		{field: &(jobSpec.MaxCores), propName: "maxCores"},
-		{field: &(jobSpec.WaitingLimit), propName: "waitingLimit"},
-		{field: &(jobSpec.WalltimeLimit), propName: "walltimeLimit"},
+		{field: &(jobSpec.ClusterID), propName: "ClusterID"},
+		{field: &(jobSpec.WaitingLimit), propName: "WaitingLimit"},
+		{field: &(jobSpec.FileTransferMethodID), propName: "FileTransferMethodID"},
 	}
 
-	for _, fieldPropName := range fieldPropNames {
-		*(fieldPropName.field), _ = getIntNodePropertyValue(ctx, e.DeploymentID,
-			e.NodeName, jobSpecificationProperty, fieldPropName.propName)
+	for _, intPropName := range intPropNames {
+		*(intPropName.field), err = getIntNodePropertyValue(ctx, e.DeploymentID,
+			e.NodeName, jobSpecificationProperty, intPropName.propName)
+		if err != nil {
+			return jobSpec, err
+		}
 	}
+
+	var boolPropNames = []struct {
+		field    *bool
+		propName string
+	}{
+		{field: &(jobSpec.NotifyOnAbort), propName: "NotifyOnAbort"},
+		{field: &(jobSpec.NotifyOnFinish), propName: "NotifyOnFinish"},
+		{field: &(jobSpec.NotifyOnStart), propName: "NotifyOnStart"},
+	}
+
+	for _, boolPropName := range boolPropNames {
+		*(boolPropName.field), err = getBoolNodePropertyValue(ctx, e.DeploymentID,
+			e.NodeName, jobSpecificationProperty, boolPropName.propName)
+		if err != nil {
+			return jobSpec, err
+		}
+	}
+
+	// TODO: get environement variables
 
 	// Getting associated tasks
 	tasks, err := deployments.GetNodePropertyValue(ctx, e.DeploymentID, e.NodeName, jobSpecificationProperty, "tasks")
@@ -440,11 +465,15 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 				taskProp   *string
 				consulProp string
 			}{
-				{taskProp: &(task.Name), consulProp: "name"},
-				{taskProp: &(task.StandardOutputFile), consulProp: "standardOutputFile"},
-				{taskProp: &(task.StandardErrorFile), consulProp: "standardErrorFile"},
-				{taskProp: &(task.ProgressFile), consulProp: "progressFile"},
-				{taskProp: &(task.LogFile), consulProp: "logFile"},
+				{taskProp: &(task.Name), consulProp: "Name"},
+				{taskProp: &(task.Name), consulProp: "Name"},
+				{taskProp: &(task.RequiredNodes), consulProp: "RequiredNodes"},
+				{taskProp: &(task.JobArrays), consulProp: "JobArrays"},
+				{taskProp: &(task.StandardInputFile), consulProp: "StandardInputFile"},
+				{taskProp: &(task.StandardOutputFile), consulProp: "StandardOutputFile"},
+				{taskProp: &(task.ProgressFile), consulProp: "ProgressFile"},
+				{taskProp: &(task.LogFile), consulProp: "LogFile"},
+				{taskProp: &(task.ClusterTaskSubdirectory), consulProp: "ClusterTaskSubdirectory"},
 			}
 
 			for _, props := range taskPropConsulPropString {
@@ -466,10 +495,12 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 				taskProp   *int
 				consulProp string
 			}{
-				{taskProp: &(task.CommandTemplateID), consulProp: "commandTemplateId"},
-				{taskProp: &(task.MinCores), consulProp: "minCores"},
-				{taskProp: &(task.MaxCores), consulProp: "maxCores"},
-				{taskProp: &(task.WalltimeLimit), consulProp: "walltimeLimit"},
+				{taskProp: &(task.MinCores), consulProp: "MinCores"},
+				{taskProp: &(task.MaxCores), consulProp: "MaxCores"},
+				{taskProp: &(task.WalltimeLimit), consulProp: "WalltimeLimit"},
+				{taskProp: &(task.Priority), consulProp: "Priority"},
+				{taskProp: &(task.ClusterNodeTypeID), consulProp: "ClusterNodeTypeID"},
+				{taskProp: &(task.CommandTemplateID), consulProp: "CommandTemplateID"},
 			}
 
 			for _, props := range taskPropConsulPropInt {
@@ -491,7 +522,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 			}
 
 			// Get template parameters
-			parameters, ok := attrMap["templateParameterValues"]
+			parameters, ok := attrMap["TemplateParameterValues"]
 			if ok {
 				paramsArray, ok := parameters.([]interface{})
 				if !ok {
@@ -509,7 +540,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 					}
 
 					var param heappe.CommandTemplateParameterValue
-					v, ok := attrMap["commandParameterIdentifier"]
+					v, ok := attrMap["CommandParameterIdentifier"]
 					if !ok {
 						return jobSpec, errors.Errorf(
 							"Failed to get command parameter identifier for deployment %s node %s task %s, parameter %+v",
@@ -522,7 +553,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 							e.DeploymentID, e.NodeName, task.Name, v)
 					}
 
-					v, ok = attrMap["parameterValue"]
+					v, ok = attrMap["ParameterValue"]
 					if ok {
 						param.ParameterValue, ok = v.(string)
 						if !ok {
@@ -538,7 +569,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 			}
 
 			// Get environment variables
-			parameters, ok = attrMap["environmentVariables"]
+			parameters, ok = attrMap["EnvironmentVariables"]
 			if ok {
 				paramsArray, ok := parameters.([]interface{})
 				if !ok {
@@ -556,7 +587,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 					}
 
 					var param heappe.EnvironmentVariable
-					v, ok := attrMap["name"]
+					v, ok := attrMap["Name"]
 					if !ok {
 						return jobSpec, errors.Errorf(
 							"Failed to get environment variable name for deployment %s node %s task %s, parameter %+v",
@@ -569,7 +600,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 							e.DeploymentID, e.NodeName, task.Name, v)
 					}
 
-					v, ok = attrMap["value"]
+					v, ok = attrMap["Value"]
 					if ok {
 						param.Value, ok = v.(string)
 						if !ok {
@@ -602,6 +633,21 @@ func getIntNodePropertyValue(ctx context.Context, deploymentID, nodeName, proper
 
 	if len(strVal) > 0 {
 		result, err = strconv.Atoi(strVal)
+	}
+	return result, err
+}
+
+func getBoolNodePropertyValue(ctx context.Context, deploymentID, nodeName, propertyName string,
+	nestedKeys ...string) (bool, error) {
+
+	result := false
+	strVal, err := deployments.GetStringNodePropertyValue(ctx, deploymentID, nodeName, propertyName, nestedKeys...)
+	if err != nil {
+		return result, err
+	}
+
+	if len(strVal) > 0 {
+		result = (strings.ToLower(strVal) == "true")
 	}
 	return result, err
 }

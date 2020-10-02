@@ -12,4 +12,4 @@ require (
 // Due to this capital letter thing we have troubles and we have to replace it explicitly
 replace github.com/Sirupsen/logrus => github.com/sirupsen/logrus v1.4.1
 
-go 1.13
+go 1.14

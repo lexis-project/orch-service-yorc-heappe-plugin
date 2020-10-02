@@ -15,9 +15,9 @@
 package job
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -414,14 +414,15 @@ func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 }
 
 func getJobExitStatus(jobInfo heappe.SubmittedJobInfo) string {
-	var exitStatus string
 
-	re := regexp.MustCompile(`Exit_status: (\d+)`)
-	match := re.FindStringSubmatch(jobInfo.AllParameters)
-	if len(match) == 2 {
-		exitStatus = match[1]
+	var buffer bytes.Buffer
+	for _, taskInfo := range jobInfo.Tasks {
+		if len(taskInfo.ErrorMessage) > 0 {
+			buffer.WriteString(fmt.Sprintf("Task %d %s: %s. ", taskInfo.ID, taskInfo.Name, taskInfo.ErrorMessage))
+		}
 	}
-	return exitStatus
+
+	return strings.TrimSpace(buffer.String())
 }
 
 func displayFileType(fType int) string {
