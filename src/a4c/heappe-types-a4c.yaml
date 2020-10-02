@@ -53,6 +53,10 @@ data_types:
         entry_schema:
           type: org.heappe.types.CommandTemplateParameterValue
         required: false
+      WalltimeLimit:
+        description: Maximum time for the task to run (in seconds)
+        type: integer
+        required: true
       MinCores:
         description: Minimum number of cores required
         type: integer
@@ -62,11 +66,6 @@ data_types:
         description: Maximum number of cores required
         type: integer
         default: 1
-        required: false
-      WalltimeLimit:
-        description: Maximum time for the task to run (in seconds)
-        type: integer
-        default: 600
         required: false
       Priority:
         description: Job priority
@@ -133,7 +132,7 @@ data_types:
       WaitingLimit:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
-        default: 36000
+        default: 0
         required: false
       ClusterId :
         description: Cluster ID
