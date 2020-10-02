@@ -62,6 +62,10 @@ data_types:
         description: Maximum time for the task to run (in seconds)
         type: integer
         default: 600
+      Priority:
+        description: Job priority
+        type: integer
+        default: 4
       EnvironmentVariables:
         description: Environment variables
         type: list
@@ -71,10 +75,6 @@ data_types:
       RequiredNodes:
         description: Required nodes
         type: string
-      Priority:
-        description: Job priority
-        type: integer
-        default: 4
       JobArrays:
         description: Job arrays
         type: string
