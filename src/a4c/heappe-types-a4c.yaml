@@ -13,127 +13,159 @@ data_types:
   org.heappe.types.CommandTemplateParameterValue:
     derived_from: tosca.datatypes.Root
     properties:
-      commandParameterIdentifier:
+      CommandParameterIdentifier :
         description: Command parameter identifier
         type: string
         required: true
-      parameterValue:
+      ParameterValue:
         description: Command parameter value
         type: string
   org.heappe.types.EnvironmentVariable:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Environment variable name
         type: string
         required: true
-      value:
+      Value:
         description: Environment variable value
         type: string
   org.heappe.types.TaskSpecification:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Task name
         type: string
         required: true
-      commandTemplateId:
-        description: Command template ID
+      MinCores:
+        description: Minimum number of cores required
+        type: integer
+        default: 1
+      MaxCores:
+        description: Maximum number of cores required
+        type: integer
+        default: 1
+      WalltimeLimit:
+        description: Maximum time for the task to run (in seconds)
+        type: integer
+        default: 600
+      RequiredNodes:
+        description: Required nodes
         type: string
-        required: true
-      templateParameterValues:
-        description: Command template parameters
-        type: list
-        entry_schema:
-          type: org.heappe.types.CommandTemplateParameterValue
+      Priority:
+        description: Job priority
+        type: integer
+        default: 4
+      JobArrays:
+        description: Job arrays
+        type: string
+      IsExclusive:
+        description: Is it exclusive
+        type: boolean
+        default: false
+      IsRerunnable:
+        description: Is it re-runnable
+        type: boolean
+        default: false
+      StandardInputFile:
+        type: string
+        default: "console_Stdout"
+      StandardOutputFile:
+        type: string
+        default: "console_Stdout"
+      StandardErrorFile:
+        type: string
+        default: "console_Stderr"
+      ProgressFile:
+        type: string
+        default: "console_Stdprog"
+      LogFile:
+        type: string
+        default: "console_Stdlog"
+      ClusterTaskSubdirectory:
+        type: string
         required: false
-      environmentVariables:
+      ClusterNodeTypeId:
+        description: Cluter node type ID
+        type: int
+        required: true
+      CommandTemplateId:
+        description: Command template ID
+        type: int
+        required: true
+      EnvironmentVariables:
         description: Environment variables
         type: list
         entry_schema:
           type: org.heappe.types.EnvironmentVariable
         required: false
-      minCores:
-        description: Minimum number of cores required
-        type: integer
-        default: 1
-      maxCores:
-        description: Maximum number of cores required
-        type: integer
-        default: 1
-      walltimeLimit:
-        description: Maximum time for the task to run (in seconds)
-        type: integer
-        default: 600
-      standardOutputFile:
-        type: string
-        default: "console_Stdout"
-      standardErrorFile:
-        type: string
-        default: "console_Stderr"
-      progressFile:
-        type: string
-        default: "console_Stdprog"
-      logFile:
-        type: string
-        default: "console_Stdlog"
+      TemplateParameterValues:
+        description: Command template parameters
+        type: list
+        entry_schema:
+          type: org.heappe.types.CommandTemplateParameterValue
+        required: false
   org.heappe.types.JobSpecification:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Job name
         type: string
         required: true
-      project:
+      Project:
         description: Accounting project
         type: string
         required: true
-      clusterNodeTypeId :
-        description: Cluster node type
+      WaitingLimit:
+        description: Limit for the waiting time in cluster queue (seconds)
+        type: integer
+        default: 600
+      NotificationEmail:
+        description: Notification email
+        type: string
+        required: false
+      PhoneNumber:
+        description: Phone number
+        type: string
+        required: false
+      NotifyOnAbort:
+        description: Send an email notification on job cancelation
+        type: boolean
+        default: false
+      NotifyOnFinish:
+        description: Send an email notification on job end
+        type: boolean
+        default: false
+      NotifyOnStart:
+        description: Send an email notification on job start
+        type: boolean
+        default: false
+      ClusterId :
+        description: Cluster ID
         type: integer
         required: true
-      tasks :
+      Tasks :
         description: Tasks (at leat one task needs to be defined)
         type: list
         entry_schema:
           type: org.heappe.types.TaskSpecification
         required: true
-      priority:
-        description: Job priority
-        type: integer
-        default: 4
-      minCores:
-        description: Minimum number of cores required
-        type: integer
-        default: 1
-      maxCores:
-        description: Maximum number of cores required
-        type: integer
-        default: 1
-      waitingLimit:
-        description: Limit for the waiting time in cluster queue (seconds)
-        type: integer
-        default: 600
-      walltimeLimit:
-        description: Maximum time for the job to run (in seconds)
-        type: integer
-        default: 600
   org.heappe.types.FileTransfer:
     derived_from: tosca.datatypes.Root
     properties:
-      user:
+      User:
         type: string
         description: >
           User used to transfer files to/from job
-      key:
+      Key:
         type: string
         description: >
           Key used to transfer files to/from job
-      server:
+      Server:
         type: string
         description: >
           Server host name used to transfer files to/from job
-      path:
+      Path:
         type: string
         description: >
           Path on remote server where to store/get job files
