@@ -2,7 +2,7 @@ tosca_definitions_version: yorc_tosca_simple_yaml_1_0
 
 metadata:
   template_name: heappe-types
-  template_version: 0.1.0
+  template_version: 0.1.1
   template_author: yorc
 
 imports:
