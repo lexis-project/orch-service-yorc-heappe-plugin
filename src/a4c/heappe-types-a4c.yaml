@@ -20,6 +20,7 @@ data_types:
       ParameterValue:
         description: Command parameter value
         type: string
+        required: false
   org.heappe.types.EnvironmentVariable:
     derived_from: tosca.datatypes.Root
     properties:
@@ -30,6 +31,7 @@ data_types:
       Value:
         description: Environment variable value
         type: string
+        required: false
   org.heappe.types.TaskSpecification:
     derived_from: tosca.datatypes.Root
     properties:
@@ -41,47 +43,59 @@ data_types:
         description: Minimum number of cores required
         type: integer
         default: 1
+        required: false
       MaxCores:
         description: Maximum number of cores required
         type: integer
         default: 1
+        required: false
       WalltimeLimit:
         description: Maximum time for the task to run (in seconds)
         type: integer
         default: 600
+        required: false
       RequiredNodes:
         description: Required nodes
         type: string
+        required: false
       Priority:
         description: Job priority
         type: integer
         default: 4
+        required: false
       JobArrays:
         description: Job arrays
         type: string
+        required: false
       IsExclusive:
         description: Is it exclusive
         type: boolean
         default: false
+        required: false
       IsRerunnable:
         description: Is it re-runnable
         type: boolean
         default: false
+        required: false
       StandardInputFile:
         type: string
-        default: "console_Stdout"
+        required: false
       StandardOutputFile:
         type: string
         default: "console_Stdout"
+        required: false
       StandardErrorFile:
         type: string
         default: "console_Stderr"
+        required: false
       ProgressFile:
         type: string
         default: "console_Stdprog"
+        required: false
       LogFile:
         type: string
         default: "console_Stdlog"
+        required: false
       ClusterTaskSubdirectory:
         type: string
         required: false
@@ -119,7 +133,8 @@ data_types:
       WaitingLimit:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
-        default: 600
+        default: 36000
+        required: false
       NotificationEmail:
         description: Notification email
         type: string
@@ -132,18 +147,22 @@ data_types:
         description: Send an email notification on job cancelation
         type: boolean
         default: false
+        required: false
       NotifyOnFinish:
         description: Send an email notification on job end
         type: boolean
         default: false
+        required: false
       NotifyOnStart:
         description: Send an email notification on job start
         type: boolean
         default: false
+        required: false
       ClusterId :
         description: Cluster ID
         type: integer
         required: true
+        required: false
       Tasks :
         description: Tasks (at leat one task needs to be defined)
         type: list

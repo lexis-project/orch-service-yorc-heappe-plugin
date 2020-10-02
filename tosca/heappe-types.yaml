@@ -68,7 +68,7 @@ data_types:
         default: false
       StandardInputFile:
         type: string
-        default: "console_Stdout"
+        required: false
       StandardOutputFile:
         type: string
         default: "console_Stdout"
@@ -118,7 +118,7 @@ data_types:
       WaitingLimit:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
-        default: 600
+        default: 36000
       NotificationEmail:
         description: Notification email
         type: string
