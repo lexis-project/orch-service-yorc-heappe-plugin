@@ -129,22 +129,21 @@ data_types:
         description: Accounting project
         type: string
         required: true
-      WaitingLimit:
-        description: Limit for the waiting time in cluster queue (seconds)
-        type: integer
-        default: 0
-        required: false
       ClusterId :
         description: Cluster ID
         type: integer
         required: true
-        required: false
       Tasks :
         description: Tasks (at leat one task needs to be defined)
         type: list
         entry_schema:
           type: org.heappe.types.TaskSpecification
         required: true
+      WaitingLimit:
+        description: Limit for the waiting time in cluster queue (seconds)
+        type: integer
+        default: 0
+        required: false
       NotificationEmail:
         description: Notification email
         type: string
