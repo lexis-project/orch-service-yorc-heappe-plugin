@@ -130,7 +130,7 @@ func (h *heappeClient) CreateJob(job JobSpecification) (int64, error) {
 	err = h.httpClient.doRequest(http.MethodPost, heappeCreateJobREST, http.StatusOK, params, &jobResponse)
 	jobID = jobResponse.ID
 	if err != nil {
-		err = errors.Wrap(err, "Failed to create job")
+		err = errors.Wrapf(err, "Failed to create job %+v", params)
 	}
 
 	return jobID, err
@@ -156,7 +156,7 @@ func (h *heappeClient) SubmitJob(jobID int64) error {
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeSubmitJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to submit job %d", jobID)
+		err = errors.Wrapf(err, "Failed to submit job %+v", params)
 	}
 
 	return err

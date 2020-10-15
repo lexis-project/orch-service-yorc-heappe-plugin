@@ -2,7 +2,7 @@ tosca_definitions_version: yorc_tosca_simple_yaml_1_0
 
 metadata:
   template_name: heappe-types
-  template_version: 0.1.1
+  template_version: 1.0.2
   template_author: yorc
 
 imports:
@@ -38,11 +38,11 @@ data_types:
         required: true
       ClusterNodeTypeId:
         description: Cluter node type ID
-        type: int
+        type: integer
         required: true
       CommandTemplateId:
         description: Command template ID
-        type: int
+        type: integer
         required: true
       TemplateParameterValues:
         description: Command template parameters
@@ -86,6 +86,11 @@ data_types:
         description: Is it re-runnable
         type: boolean
         default: false
+      CpuHyperThreading:
+        description: CPU Hyper threading
+        type: boolean
+        default: false
+        required: false
       StandardInputFile:
         type: string
         required: false
@@ -129,6 +134,11 @@ data_types:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
         default: 0
+      FileTransferMethodId:
+        description: File transfer method (0 for NetworkShare, 1 for SftpScp)
+        type: integer
+        default: 1
+        required: false
       NotificationEmail:
         description: Notification email
         type: string

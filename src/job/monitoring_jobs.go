@@ -395,7 +395,17 @@ func getActionDataOffsetKey(jobID, taskID int64, fileType int) string {
 
 func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 	var strValue string
-	switch jobInfo.State {
+	strValue, err := stateToString(jobInfo.State)
+	if err != nil {
+		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, jobInfo.State)
+	}
+	return strValue
+}
+
+func stateToString(state int) (string, error) {
+	strValue := jobStateFailed
+	var err error
+	switch state {
 	case 0, 1, 2, 4:
 		strValue = jobStatePending
 	case 8:
@@ -407,18 +417,18 @@ func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 	case 64:
 		strValue = jobStateFailed // HEAppE state canceled
 	default:
-		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, jobInfo.State)
-		strValue = jobStateFailed
+		err = errors.Errorf("Unknown state value %d", state)
 	}
-	return strValue
+	return strValue, err
 }
 
 func getJobExitStatus(jobInfo heappe.SubmittedJobInfo) string {
 
 	var buffer bytes.Buffer
 	for _, taskInfo := range jobInfo.Tasks {
-		if len(taskInfo.ErrorMessage) > 0 {
-			buffer.WriteString(fmt.Sprintf("Task %d %s: %s. ", taskInfo.ID, taskInfo.Name, taskInfo.ErrorMessage))
+		stateStr, _ := stateToString(taskInfo.State)
+		if stateStr == jobStateFailed {
+			buffer.WriteString(fmt.Sprintf("Task %d %s %s: %s. ", taskInfo.ID, taskInfo.Name, stateStr, taskInfo.ErrorMessage))
 		}
 	}
 

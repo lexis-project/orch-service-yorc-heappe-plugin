@@ -65,6 +65,7 @@ type TaskSpecification struct {
 	JobArrays               string
 	IsExclusive             bool
 	IsRerunnable            bool
+	CpuHyperThreading       bool
 	StandardInputFile       string
 	StandardOutputFile      string
 	StandardErrorFile       string
@@ -73,9 +74,9 @@ type TaskSpecification struct {
 	ClusterTaskSubdirectory string
 	ClusterNodeTypeID       int                   `json:"ClusterNodeTypeId"`
 	CommandTemplateID       int                   `json:"CommandTemplateId"`
-	EnvironmentVariables    []EnvironmentVariable `json:"EnvironmentVariables,omitempty"`
+	EnvironmentVariables    []EnvironmentVariable `json:"EnvironmentVariables"`
 	// TODO: DependsOn
-	TemplateParameterValues []CommandTemplateParameterValue `json:"TemplateParameterValues,omitempty"`
+	TemplateParameterValues []CommandTemplateParameterValue `json:"TemplateParameterValues"`
 }
 
 // JobSpecification holds job properties
@@ -90,7 +91,7 @@ type JobSpecification struct {
 	NotifyOnStart        bool
 	ClusterID            int                   `json:"ClusterId"`
 	FileTransferMethodID int                   `json:"FileTransferMethodId"`
-	EnvironmentVariables []EnvironmentVariable `json:"EnvironmentVariables,omitempty"`
+	EnvironmentVariables []EnvironmentVariable `json:"EnvironmentVariables"`
 	Tasks                []TaskSpecification
 }
 

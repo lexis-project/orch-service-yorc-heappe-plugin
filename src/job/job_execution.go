@@ -401,9 +401,9 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 		field    *int
 		propName string
 	}{
-		{field: &(jobSpec.ClusterID), propName: "ClusterID"},
+		{field: &(jobSpec.ClusterID), propName: "ClusterId"},
 		{field: &(jobSpec.WaitingLimit), propName: "WaitingLimit"},
-		{field: &(jobSpec.FileTransferMethodID), propName: "FileTransferMethodID"},
+		{field: &(jobSpec.FileTransferMethodID), propName: "FileTransferMethodId"},
 	}
 
 	for _, intPropName := range intPropNames {
@@ -434,7 +434,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 	// TODO: get environement variables
 
 	// Getting associated tasks
-	tasks, err := deployments.GetNodePropertyValue(ctx, e.DeploymentID, e.NodeName, jobSpecificationProperty, "tasks")
+	tasks, err := deployments.GetNodePropertyValue(ctx, e.DeploymentID, e.NodeName, jobSpecificationProperty, "Tasks")
 	if err != nil {
 		return jobSpec, err
 	}
@@ -466,11 +466,11 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 				consulProp string
 			}{
 				{taskProp: &(task.Name), consulProp: "Name"},
-				{taskProp: &(task.Name), consulProp: "Name"},
 				{taskProp: &(task.RequiredNodes), consulProp: "RequiredNodes"},
 				{taskProp: &(task.JobArrays), consulProp: "JobArrays"},
 				{taskProp: &(task.StandardInputFile), consulProp: "StandardInputFile"},
 				{taskProp: &(task.StandardOutputFile), consulProp: "StandardOutputFile"},
+				{taskProp: &(task.StandardErrorFile), consulProp: "StandardErrorFile"},
 				{taskProp: &(task.ProgressFile), consulProp: "ProgressFile"},
 				{taskProp: &(task.LogFile), consulProp: "LogFile"},
 				{taskProp: &(task.ClusterTaskSubdirectory), consulProp: "ClusterTaskSubdirectory"},
@@ -499,8 +499,8 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 				{taskProp: &(task.MaxCores), consulProp: "MaxCores"},
 				{taskProp: &(task.WalltimeLimit), consulProp: "WalltimeLimit"},
 				{taskProp: &(task.Priority), consulProp: "Priority"},
-				{taskProp: &(task.ClusterNodeTypeID), consulProp: "ClusterNodeTypeID"},
-				{taskProp: &(task.CommandTemplateID), consulProp: "CommandTemplateID"},
+				{taskProp: &(task.ClusterNodeTypeID), consulProp: "ClusterNodeTypeId"},
+				{taskProp: &(task.CommandTemplateID), consulProp: "CommandTemplateId"},
 			}
 
 			for _, props := range taskPropConsulPropInt {
@@ -509,7 +509,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 					val, ok := rawValue.(string)
 					if !ok {
 						return jobSpec, errors.Errorf(
-							"Expected an int for deployment %s node %s task %s property %s, got %+v",
+							"Expected a string stored for deployment %s node %s task %s property %s, got %+v",
 							e.DeploymentID, e.NodeName, task.Name, props.consulProp, rawValue)
 					}
 					*props.taskProp, err = strconv.Atoi(val)
@@ -518,6 +518,28 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 							"Cannot convert as an int value %q for deployment %s node %s task %s property %s",
 							val, e.DeploymentID, e.NodeName, task.Name, props.consulProp)
 					}
+				}
+			}
+
+			var taskPropConsulPropBool = []struct {
+				taskProp   *bool
+				consulProp string
+			}{
+				{taskProp: &(task.IsExclusive), consulProp: "IsExclusive"},
+				{taskProp: &(task.IsRerunnable), consulProp: "IsRerunnable"},
+				{taskProp: &(task.CpuHyperThreading), consulProp: "CpuHyperThreading"},
+			}
+
+			for _, props := range taskPropConsulPropBool {
+				rawValue, ok := attrMap[props.consulProp]
+				if ok {
+					val, ok := rawValue.(string)
+					if !ok {
+						return jobSpec, errors.Errorf(
+							"Expected a string stored for deployment %s node %s task %s property %s, got %+v",
+							e.DeploymentID, e.NodeName, task.Name, props.consulProp, rawValue)
+					}
+					*props.taskProp = (strings.ToLower(val) == "true")
 				}
 			}
 
