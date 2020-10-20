@@ -135,9 +135,9 @@ data_types:
         type: integer
         default: 0
       FileTransferMethodId:
-        description: File transfer method (0 for NetworkShare, 1 for SftpScp)
+        description: File transfer method (1 for NetworkShare, 2 for SftpScp)
         type: integer
-        default: 1
+        default: 2
         required: false
       NotificationEmail:
         description: Notification email
