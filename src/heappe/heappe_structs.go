@@ -26,9 +26,9 @@ type FileTransferProtocol int
 
 const (
 	// NetworkShare file transfer protocol
-	NetworkShare FileTransferProtocol = iota
+	NetworkShare FileTransferProtocol = 1
 	// SftpScp file transfer protocol
-	SftpScp
+	SftpScp = 2
 )
 
 // PasswordCredentials holds user/password to perform a basic authentication
