@@ -15,6 +15,7 @@
 package heappe
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -125,6 +126,9 @@ func (h *heappeClient) CreateJob(job JobSpecification) (int64, error) {
 		JobSpecification: job,
 		SessionCode:      h.sessionID,
 	}
+
+	createStr, _ := json.Marshal(params)
+	log.Debugf("Creating job %s", string(createStr))
 	var jobResponse SubmittedJobInfo
 
 	err = h.httpClient.doRequest(http.MethodPost, heappeCreateJobREST, http.StatusOK, params, &jobResponse)
