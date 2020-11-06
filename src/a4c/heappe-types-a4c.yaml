@@ -209,7 +209,7 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
-      jobSpecification:
+      JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
         required: true
@@ -228,6 +228,12 @@ node_types:
         # entry_schema:
         #  type: string
         description: List of files created or changed by the job execution
+      tasks_name_id:
+        type: map
+        # entry schema not expected by Alien4Cloud
+        # entry_schema:
+        #  type: string
+        description: Map of task name - task ID
     capabilities:
       heappejob:
         type: org.heappe.capabilities.HeappeJob

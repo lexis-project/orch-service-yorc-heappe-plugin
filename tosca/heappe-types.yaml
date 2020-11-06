@@ -188,7 +188,7 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
-      jobSpecification:
+      JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
         required: true
@@ -205,6 +205,11 @@ node_types:
         type: list
         entry_schema:
           description: List of files created or changed by the job execution
+          type: string
+      tasks_name_id:
+        type: map
+        description: Map of task name - task ID
+        entry_schema:
           type: string
     capabilities:
       heappejob:

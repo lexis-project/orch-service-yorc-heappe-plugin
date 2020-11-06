@@ -39,7 +39,7 @@ const (
 	enableFileTransferOperation   = "custom.enable_file_transfer"
 	disableFileTransferOperation  = "custom.disable_file_transfer"
 	listChangedFilesOperation     = "custom.list_changed_files"
-	jobSpecificationProperty      = "jobSpecification"
+	jobSpecificationProperty      = "JobSpecification"
 	infrastructureType            = "heappe"
 	jobIDConsulAttribute          = "job_id"
 	transferUser                  = "user"
@@ -48,6 +48,7 @@ const (
 	transferPath                  = "path"
 	transferConsulAttribute       = "file_transfer"
 	transferObjectConsulAttribute = "transfer_object"
+	tasksNameIDConsulAttribute    = "tasks_name_id"
 	changedFilesConsulAttribute   = "changed_files"
 )
 
@@ -168,17 +169,31 @@ func (e *Execution) createJob(ctx context.Context) error {
 		return err
 	}
 
-	jobID, err := heappeClient.CreateJob(jobSpec)
+	jobInfo, err := heappeClient.CreateJob(jobSpec)
 	if err != nil {
 		return err
 	}
 
 	// Store the job id
 	err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
-		jobIDConsulAttribute, strconv.FormatInt(jobID, 10))
+		jobIDConsulAttribute, strconv.FormatInt(jobInfo.ID, 10))
 	if err != nil {
-		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store this job id", jobID)
+		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store this job id", jobInfo.ID)
+		return err
 	}
+
+	// Store the map providing the correspondance between task names and task IDs
+	tasksNameId := make(map[string]string, len(jobInfo.Tasks))
+	for _, taskInfo := range jobInfo.Tasks {
+		tasksNameId[taskInfo.Name] = strconv.FormatInt(taskInfo.ID, 10)
+	}
+	err = deployments.SetAttributeComplexForAllInstances(ctx, e.DeploymentID, e.NodeName, tasksNameIDConsulAttribute,
+		tasksNameId)
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d, failed to store taskIDs details", jobInfo.ID)
+		return err
+	}
+
 	return err
 }
 

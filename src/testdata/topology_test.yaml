@@ -24,7 +24,7 @@ topology_template:
     TestJob:
       type: org.heappe.nodes.Job
       properties:
-        jobSpecification: 
+        JobSpecification: 
           name: testJobName
           project: testProjectName
           clusterNodeTypeId: 1

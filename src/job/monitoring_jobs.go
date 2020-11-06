@@ -215,7 +215,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 }
 
 func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.Client,
-	deploymentID, nodeName string, action *prov.Action, jobInfo heappe.SubmittedJobInfo) error {
+	deploymentID, nodeName string, action *prov.Action, jobInfo heappe.JobInfo) error {
 
 	var err error
 	var offsets []heappe.TaskFileOffset
@@ -393,7 +393,7 @@ func getActionDataOffsetKey(jobID, taskID int64, fileType int) string {
 	return fmt.Sprintf(actionDataOffsetKeyFormat, jobID, taskID, fileType)
 }
 
-func getJobState(jobInfo heappe.SubmittedJobInfo) string {
+func getJobState(jobInfo heappe.JobInfo) string {
 	var strValue string
 	strValue, err := stateToString(jobInfo.State)
 	if err != nil {
@@ -422,7 +422,7 @@ func stateToString(state int) (string, error) {
 	return strValue, err
 }
 
-func getJobExitStatus(jobInfo heappe.SubmittedJobInfo) string {
+func getJobExitStatus(jobInfo heappe.JobInfo) string {
 
 	var buffer bytes.Buffer
 	for _, taskInfo := range jobInfo.Tasks {

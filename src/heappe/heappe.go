@@ -48,11 +48,11 @@ const (
 
 // Client is the client interface to HEAppE service
 type Client interface {
-	CreateJob(job JobSpecification) (int64, error)
+	CreateJob(job JobSpecification) (JobInfo, error)
 	SubmitJob(jobID int64) error
 	CancelJob(jobID int64) error
 	DeleteJob(jobID int64) error
-	GetJobInfo(jobID int64) (SubmittedJobInfo, error)
+	GetJobInfo(jobID int64) (JobInfo, error)
 	SetSessionID(sessionID string)
 	GetSessionID() string
 	DownloadPartsOfJobFilesFromCluster(JobID int64, offsets []TaskFileOffset) ([]JobFileContent, error)
@@ -112,14 +112,15 @@ func (h *heappeClient) GetSessionID() string {
 }
 
 // CreateJob creates a HEAppE job
-func (h *heappeClient) CreateJob(job JobSpecification) (int64, error) {
+func (h *heappeClient) CreateJob(job JobSpecification) (JobInfo, error) {
+
+	var jobResponse JobInfo
 
 	// First authenticate
-	var jobID int64
 	var err error
 	h.sessionID, err = h.authenticate()
 	if err != nil {
-		return jobID, err
+		return jobResponse, err
 	}
 
 	params := JobCreateRESTParams{
@@ -128,16 +129,14 @@ func (h *heappeClient) CreateJob(job JobSpecification) (int64, error) {
 	}
 
 	createStr, _ := json.Marshal(params)
-	log.Debugf("Creating job %s", string(createStr))
-	var jobResponse SubmittedJobInfo
+	log.Printf("LOLO Creating job %s", string(createStr))
 
 	err = h.httpClient.doRequest(http.MethodPost, heappeCreateJobREST, http.StatusOK, params, &jobResponse)
-	jobID = jobResponse.ID
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to create job %+v", params)
 	}
 
-	return jobID, err
+	return jobResponse, err
 }
 
 // SubmitJob submits a HEAppE job
@@ -156,7 +155,7 @@ func (h *heappeClient) SubmitJob(jobID int64) error {
 		SessionCode:      h.sessionID,
 	}
 
-	var jobResponse SubmittedJobInfo
+	var jobResponse JobInfo
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeSubmitJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
@@ -182,7 +181,7 @@ func (h *heappeClient) CancelJob(jobID int64) error {
 		SessionCode:        h.sessionID,
 	}
 
-	var jobResponse SubmittedJobInfo
+	var jobResponse JobInfo
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeCancelJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
@@ -219,9 +218,9 @@ func (h *heappeClient) DeleteJob(jobID int64) error {
 }
 
 // GetJobInfo gets a HEAppE job info
-func (h *heappeClient) GetJobInfo(jobID int64) (SubmittedJobInfo, error) {
+func (h *heappeClient) GetJobInfo(jobID int64) (JobInfo, error) {
 
-	var jobInfo SubmittedJobInfo
+	var jobInfo JobInfo
 
 	if h.sessionID == "" {
 		var err error

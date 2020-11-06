@@ -39,7 +39,7 @@ type PasswordCredentials struct {
 
 // Authentication parameters
 type Authentication struct {
-	Credentials PasswordCredentials `json:"credentials"`
+	Credentials PasswordCredentials
 }
 
 // CommandTemplateParameterValue holds a command template parameter
@@ -72,11 +72,11 @@ type TaskSpecification struct {
 	ProgressFile            string
 	LogFile                 string
 	ClusterTaskSubdirectory string
-	ClusterNodeTypeID       int                   `json:"ClusterNodeTypeId"`
-	CommandTemplateID       int                   `json:"CommandTemplateId"`
-	EnvironmentVariables    []EnvironmentVariable `json:"EnvironmentVariables"`
+	ClusterNodeTypeID       int `json:"ClusterNodeTypeId"`
+	CommandTemplateID       int `json:"CommandTemplateId"`
+	EnvironmentVariables    []EnvironmentVariable
 	// TODO: DependsOn
-	TemplateParameterValues []CommandTemplateParameterValue `json:"TemplateParameterValues"`
+	TemplateParameterValues []CommandTemplateParameterValue
 }
 
 // JobSpecification holds job properties
@@ -89,28 +89,28 @@ type JobSpecification struct {
 	NotifyOnAbort        bool
 	NotifyOnFinish       bool
 	NotifyOnStart        bool
-	ClusterID            int                   `json:"ClusterId"`
-	FileTransferMethodID int                   `json:"FileTransferMethodId"`
-	EnvironmentVariables []EnvironmentVariable `json:"EnvironmentVariables"`
+	ClusterID            int `json:"ClusterId"`
+	FileTransferMethodID int `json:"FileTransferMethodId"`
+	EnvironmentVariables []EnvironmentVariable
 	Tasks                []TaskSpecification
 }
 
 // JobCreateRESTParams holds HEAppE REST API job creation parameters
 type JobCreateRESTParams struct {
-	JobSpecification JobSpecification `json:"jobSpecification"`
-	SessionCode      string           `json:"sessionCode"`
+	JobSpecification JobSpecification
+	SessionCode      string
 }
 
 // JobSubmitRESTParams holds HEAppE REST API job submission parameters
 type JobSubmitRESTParams struct {
-	CreatedJobInfoID int64  `json:"createdJobInfoId"`
-	SessionCode      string `json:"sessionCode"`
+	CreatedJobInfoID int64 `json:"CreatedJobInfoId"`
+	SessionCode      string
 }
 
 // JobInfoRESTParams holds HEAppE REST API job info parameters
 type JobInfoRESTParams struct {
-	SubmittedJobInfoID int64  `json:"submittedJobInfoId"`
-	SessionCode        string `json:"sessionCode"`
+	SubmittedJobInfoID int64 `json:"SubmittedJobInfoId"`
+	SessionCode        string
 }
 
 // TemplateParameter holds template parameters description in a job
@@ -139,8 +139,8 @@ type ClusterNodeType struct {
 	CommandTemplates []CommandTemplate
 }
 
-// SubmittedTaskInfo holds a task description in a job
-type SubmittedTaskInfo struct {
+// TaskInfo holds a task description in a job
+type TaskInfo struct {
 	ID                int64 `json:"Id"`
 	Name              string
 	State             int
@@ -154,8 +154,8 @@ type SubmittedTaskInfo struct {
 	CpuHyperThreading bool
 }
 
-// SubmittedJobInfo holds the response to a job creation/submission
-type SubmittedJobInfo struct {
+// JobInfo holds the response to a job creation/submission
+type JobInfo struct {
 	ID                 int64 `json:"Id"`
 	Name               string
 	State              int
@@ -165,7 +165,7 @@ type SubmittedJobInfo struct {
 	StartTime          string
 	EndTime            string
 	TotalAllocatedTime float64
-	Tasks              []SubmittedTaskInfo
+	Tasks              []TaskInfo
 }
 
 // TaskFileOffset holds the offset to a file of a given task
@@ -178,9 +178,9 @@ type TaskFileOffset struct {
 // DownloadPartsOfJobFilesRESTParams holds HEAppE parameters for the REST API
 // allowing to download parts of files
 type DownloadPartsOfJobFilesRESTParams struct {
-	SubmittedJobInfoID int64            `json:"submittedJobInfoId"`
-	TaskFileOffsets    []TaskFileOffset `json:"taskFileOffsets"`
-	SessionCode        string           `json:"sessionCode"`
+	SubmittedJobInfoID int64 `json:"SubmittedJobInfoId"`
+	TaskFileOffsets    []TaskFileOffset
+	SessionCode        string
 }
 
 // JobFileContent holds the response to a partial download of job files
@@ -210,23 +210,23 @@ type FileTransferMethod struct {
 // EndFileTransferRESTParams holds parameters used in the REST API call to notify
 // the end of files trasnfer
 type EndFileTransferRESTParams struct {
-	SubmittedJobInfoID int64              `json:"submittedJobInfoId"`
-	UsedTransferMethod FileTransferMethod `json:"usedTransferMethod"`
-	SessionCode        string             `json:"sessionCode"`
+	SubmittedJobInfoID int64 `json:"SubmittedJobInfoId"`
+	UsedTransferMethod FileTransferMethod
+	SessionCode        string
 }
 
 // DownloadFileRESTParams holds HEAppE parameters for the REST API
 // allowing to download a file
 type DownloadFileRESTParams struct {
-	SubmittedJobInfoID int64  `json:"submittedJobInfoId"`
-	RelativeFilePath   string `json:"relativeFilePath"`
-	SessionCode        string `json:"sessionCode"`
+	SubmittedJobInfoID int64 `json:"SubmittedJobInfoId"`
+	RelativeFilePath   string
+	SessionCode        string
 }
 
 // ListAdaptorUserGroupsRESTParams holds parameters used in the REST API call to
 // get details on users
 type ListAdaptorUserGroupsRESTParams struct {
-	SessionCode string `json:"sessionCode"`
+	SessionCode string
 }
 
 // AdaptorUser hold user name and id properties
@@ -269,10 +269,10 @@ type NodeTypeAggregatedUsage struct {
 // UserResourceUsageRESTParams holds parameters used in the REST API call to
 // get resources usage report for a user
 type UserResourceUsageRESTParams struct {
-	UserID      int64  `json:"userId"`
-	StartTime   string `json:"startTime"`
-	EndTime     string `json:"endTime"`
-	SessionCode string `json:"sessionCode"`
+	UserID      int64 `json:"UserId"`
+	StartTime   string
+	EndTime     string
+	SessionCode string
 }
 
 // UserResourceUsageReport holds a report of resources by a user for a given time frame
@@ -302,8 +302,8 @@ type ClusterNodeUsage struct {
 // ClusterNodeUsageRESTParams holds parameters used in the REST API call to
 // get the current usage of a given cluster node
 type ClusterNodeUsageRESTParams struct {
-	ClusterNodeID int64  `json:"clusterNodeId"`
-	SessionCode   string `json:"sessionCode"`
+	ClusterNodeID int64 `json:"ClusterNodeId"`
+	SessionCode   string
 }
 
 // UnmarshalJSON is used to read a file transfer protocol from a string
