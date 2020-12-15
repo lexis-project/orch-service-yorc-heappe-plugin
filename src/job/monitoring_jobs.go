@@ -15,9 +15,9 @@
 package job
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -215,7 +215,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 }
 
 func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.Client,
-	deploymentID, nodeName string, action *prov.Action, jobInfo heappe.SubmittedJobInfo) error {
+	deploymentID, nodeName string, action *prov.Action, jobInfo heappe.JobInfo) error {
 
 	var err error
 	var offsets []heappe.TaskFileOffset
@@ -393,9 +393,19 @@ func getActionDataOffsetKey(jobID, taskID int64, fileType int) string {
 	return fmt.Sprintf(actionDataOffsetKeyFormat, jobID, taskID, fileType)
 }
 
-func getJobState(jobInfo heappe.SubmittedJobInfo) string {
+func getJobState(jobInfo heappe.JobInfo) string {
 	var strValue string
-	switch jobInfo.State {
+	strValue, err := stateToString(jobInfo.State)
+	if err != nil {
+		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, jobInfo.State)
+	}
+	return strValue
+}
+
+func stateToString(state int) (string, error) {
+	strValue := jobStateFailed
+	var err error
+	switch state {
 	case 0, 1, 2, 4:
 		strValue = jobStatePending
 	case 8:
@@ -407,21 +417,22 @@ func getJobState(jobInfo heappe.SubmittedJobInfo) string {
 	case 64:
 		strValue = jobStateFailed // HEAppE state canceled
 	default:
-		log.Printf("Error getting state for job %d, unexpected state %d, considering it failed", jobInfo.ID, jobInfo.State)
-		strValue = jobStateFailed
+		err = errors.Errorf("Unknown state value %d", state)
 	}
-	return strValue
+	return strValue, err
 }
 
-func getJobExitStatus(jobInfo heappe.SubmittedJobInfo) string {
-	var exitStatus string
+func getJobExitStatus(jobInfo heappe.JobInfo) string {
 
-	re := regexp.MustCompile(`Exit_status: (\d+)`)
-	match := re.FindStringSubmatch(jobInfo.AllParameters)
-	if len(match) == 2 {
-		exitStatus = match[1]
+	var buffer bytes.Buffer
+	for _, taskInfo := range jobInfo.Tasks {
+		stateStr, _ := stateToString(taskInfo.State)
+		if stateStr == jobStateFailed {
+			buffer.WriteString(fmt.Sprintf("Task %d %s %s: %s. ", taskInfo.ID, taskInfo.Name, stateStr, taskInfo.ErrorMessage))
+		}
 	}
-	return exitStatus
+
+	return strings.TrimSpace(buffer.String())
 }
 
 func displayFileType(fType int) string {

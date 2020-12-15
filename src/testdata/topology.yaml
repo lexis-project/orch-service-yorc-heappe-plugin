@@ -22,7 +22,7 @@ topology_template:
     HEAppEJob:
       type: org.heappe.nodes.Job
       properties:
-        jobSpecification: 
+        JobSpecification: 
           name: testJobName
           project: testProjectName
           clusterNodeTypeId: 1

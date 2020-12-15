@@ -2,7 +2,7 @@ tosca_definitions_version: alien_dsl_2_0_0
 
 metadata:
   template_name: heappe-types
-  template_version: 0.1.0
+  template_version: 1.0.2
   template_author: yorc
 
 imports:
@@ -13,127 +13,186 @@ data_types:
   org.heappe.types.CommandTemplateParameterValue:
     derived_from: tosca.datatypes.Root
     properties:
-      commandParameterIdentifier:
+      CommandParameterIdentifier :
         description: Command parameter identifier
         type: string
         required: true
-      parameterValue:
+      ParameterValue:
         description: Command parameter value
         type: string
+        required: false
   org.heappe.types.EnvironmentVariable:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Environment variable name
         type: string
         required: true
-      value:
+      Value:
         description: Environment variable value
         type: string
+        required: false
   org.heappe.types.TaskSpecification:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Task name
         type: string
         required: true
-      commandTemplateId:
-        description: Command template ID
-        type: string
+      ClusterNodeTypeId:
+        description: Cluter node type ID
+        type: integer
         required: true
-      templateParameterValues:
+      CommandTemplateId:
+        description: Command template ID
+        type: integer
+        required: true
+      TemplateParameterValues:
         description: Command template parameters
         type: list
         entry_schema:
           type: org.heappe.types.CommandTemplateParameterValue
         required: false
-      environmentVariables:
+      WalltimeLimit:
+        description: Maximum time for the task to run (in seconds)
+        type: integer
+        required: true
+      MinCores:
+        description: Minimum number of cores required
+        type: integer
+        default: 1
+        required: false
+      MaxCores:
+        description: Maximum number of cores required
+        type: integer
+        default: 1
+        required: false
+      Priority:
+        description: Job priority
+        type: integer
+        default: 4
+        required: false
+      EnvironmentVariables:
         description: Environment variables
         type: list
         entry_schema:
           type: org.heappe.types.EnvironmentVariable
         required: false
-      minCores:
-        description: Minimum number of cores required
-        type: integer
-        default: 1
-      maxCores:
-        description: Maximum number of cores required
-        type: integer
-        default: 1
-      walltimeLimit:
-        description: Maximum time for the task to run (in seconds)
-        type: integer
-        default: 600
-      standardOutputFile:
+      RequiredNodes:
+        description: Required nodes
+        type: string
+        required: false
+      JobArrays:
+        description: Job arrays
+        type: string
+        required: false
+      IsExclusive:
+        description: Is it exclusive
+        type: boolean
+        default: false
+        required: false
+      IsRerunnable:
+        description: Is it re-runnable
+        type: boolean
+        default: false
+        required: false
+      CpuHyperThreading:
+        description: CPU Hyper threading
+        type: boolean
+        default: false
+        required: false
+      StandardInputFile:
+        type: string
+        required: false
+      StandardOutputFile:
         type: string
         default: "console_Stdout"
-      standardErrorFile:
+        required: false
+      StandardErrorFile:
         type: string
         default: "console_Stderr"
-      progressFile:
+        required: false
+      ProgressFile:
         type: string
         default: "console_Stdprog"
-      logFile:
+        required: false
+      LogFile:
         type: string
         default: "console_Stdlog"
+        required: false
+      ClusterTaskSubdirectory:
+        type: string
+        required: false
   org.heappe.types.JobSpecification:
     derived_from: tosca.datatypes.Root
     properties:
-      name:
+      Name:
         description: Job name
         type: string
         required: true
-      project:
+      Project:
         description: Accounting project
         type: string
         required: true
-      clusterNodeTypeId :
-        description: Cluster node type
+      ClusterId :
+        description: Cluster ID
         type: integer
         required: true
-      tasks :
+      Tasks :
         description: Tasks (at leat one task needs to be defined)
         type: list
         entry_schema:
           type: org.heappe.types.TaskSpecification
         required: true
-      priority:
-        description: Job priority
-        type: integer
-        default: 4
-      minCores:
-        description: Minimum number of cores required
-        type: integer
-        default: 1
-      maxCores:
-        description: Maximum number of cores required
-        type: integer
-        default: 1
-      waitingLimit:
+      WaitingLimit:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
-        default: 600
-      walltimeLimit:
-        description: Maximum time for the job to run (in seconds)
+        default: 0
+        required: false
+      FileTransferMethodId:
+        description: File transfer method (1 for NetworkShare, 2 for SftpScp)
         type: integer
-        default: 600
+        default: 2
+        required: false
+      NotificationEmail:
+        description: Notification email
+        type: string
+        required: false
+      PhoneNumber:
+        description: Phone number
+        type: string
+        required: false
+      NotifyOnAbort:
+        description: Send an email notification on job cancelation
+        type: boolean
+        default: false
+        required: false
+      NotifyOnFinish:
+        description: Send an email notification on job end
+        type: boolean
+        default: false
+        required: false
+      NotifyOnStart:
+        description: Send an email notification on job start
+        type: boolean
+        default: false
+        required: false
   org.heappe.types.FileTransfer:
     derived_from: tosca.datatypes.Root
     properties:
-      user:
+      User:
         type: string
         description: >
           User used to transfer files to/from job
-      key:
+      Key:
         type: string
         description: >
           Key used to transfer files to/from job
-      server:
+      Server:
         type: string
         description: >
           Server host name used to transfer files to/from job
-      path:
+      Path:
         type: string
         description: >
           Path on remote server where to store/get job files
@@ -150,7 +209,7 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
-      jobSpecification:
+      JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
         required: true
@@ -169,6 +228,12 @@ node_types:
         # entry_schema:
         #  type: string
         description: List of files created or changed by the job execution
+      tasks_name_id:
+        type: map
+        # entry schema not expected by Alien4Cloud
+        # entry_schema:
+        #  type: string
+        description: Map of task name - task ID
     capabilities:
       heappejob:
         type: org.heappe.capabilities.HeappeJob
@@ -214,6 +279,24 @@ node_types:
     derived_from: org.heappe.nodes.pub.Job
     description: >
       HEAppE Job
+  org.heappe.nodes.JobWithRuntimeTaskParameters:
+    derived_from: org.heappe.nodes.pub.Job
+    description: >
+      HEAppE Job where tasks parameters are provided by another compoent
+    requirements:
+      - tasks_parameters_provider:
+          capability: org.heappe.capabilities.TasksParametersProvider
+          node: tosca.nodes.Root
+          relationship: org.heappe.relationships.TasksParametersProvider
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        create:
+          inputs:
+            TASKS_PARAMETERS: { get_attribute: [REQ_TARGET, tasks_parameters_provider, tasks_parameters] }
+          implementation:
+            file: heappe-types-a4c.yaml
+            type: tosca.artifacts.Deployment.Image.Container.Docker
   org.heappe.nodes.pub.WaitFileAndGetContentJob:
     derived_from: tosca.nodes.Root
     abstract: true
@@ -414,11 +497,21 @@ capability_types:
       filecontent:
         type: string
         description: File content
+  org.heappe.capabilities.TasksParametersProvider:
+    derived_from: tosca.capabilities.Root
+    description: >
+      A capability providing tasks parameters to a job.
+    attributes:
+      tasks_parameters:
+        type: string
+        description: |
+          Base64-encoded string of a json map of tasks parameters.
+          Example: {"FirstTask": [{"CommandParameterIdentifier": "param1", "ParameterValue": "value1"}]}
 relationship_types:
   org.heappe.relationships.DependsOnJob:
     derived_from: tosca.relationships.DependsOn
     description: Relationship between a component and a HEAppE job
-    valid_target_types: [ org.heappe.nodes.pub.Job ]
+    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
   org.heappe.relationships.SendInputsToJob:
     derived_from: org.heappe.relationships.DependsOnJob
   org.heappe.relationships.GetResultsFromJob:
@@ -426,8 +519,11 @@ relationship_types:
   org.heappe.relationships.CopyResults:
     derived_from: tosca.relationships.DependsOn
     description: Relationship between a component and a HEAppE job Results
-    valid_target_types: [ org.heappe.nodes.pub.Results ]
+    valid_target_types: [ org.heappe.capabilities.HeappeJobResults ]
   org.heappe.relationships.FileContent:
     derived_from: tosca.relationships.DependsOn
-    valid_target_types: [ org.heappe.nodes.pub.Job ]
+    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
+  org.heappe.relationships.TasksParametersProvider:
+    derived_from: tosca.relationships.DependsOn
+    valid_target_types: [ org.heappe.capabilities.TasksParametersProvider ]
 

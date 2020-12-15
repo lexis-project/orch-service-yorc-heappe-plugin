@@ -32,7 +32,7 @@ const (
 	heappeInfrastructureType              = "heappe"
 	locationJobMonitoringTimeInterval     = "job_monitoring_time_interval"
 	locationDefaultMonitoringTimeInterval = 5 * time.Second
-	heappeJobType                         = "org.heappe.nodes.Job"
+	heappeJobType                         = "org.heappe.nodes.pub.Job"
 	heappeSendDatasetType                 = "org.heappe.nodes.Dataset"
 	heappeReceiveDatasetType              = "org.heappe.nodes.Results"
 	heappeWaitFileGetContent              = "org.heappe.nodes.WaitFileAndGetContentJob"
@@ -87,7 +87,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			MonitoringTimeInterval: monitoringTimeInterval,
 		}
 
-		return exec, err
+		return exec, exec.ResolveExecution(ctx)
 	}
 
 	isReceiveDataset := false
