@@ -16,7 +16,9 @@ package job
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +31,9 @@ import (
 	"github.com/ystia/yorc/v4/deployments"
 	"github.com/ystia/yorc/v4/events"
 	"github.com/ystia/yorc/v4/locations"
+	"github.com/ystia/yorc/v4/log"
 	"github.com/ystia/yorc/v4/prov"
+	"github.com/ystia/yorc/v4/prov/operations"
 	"github.com/ystia/yorc/v4/tosca"
 )
 
@@ -50,6 +54,7 @@ const (
 	transferObjectConsulAttribute = "transfer_object"
 	tasksNameIDConsulAttribute    = "tasks_name_id"
 	changedFilesConsulAttribute   = "changed_files"
+	tasksParamsEnvVar             = "TASKS_PARAMETERS"
 )
 
 // Execution holds job Execution properties
@@ -62,6 +67,8 @@ type Execution struct {
 	Operation              prov.Operation
 	JobID                  int64
 	MonitoringTimeInterval time.Duration
+	EnvInputs              []*operations.EnvInput
+	VarInputsNames         []string
 }
 
 // ExecuteAsync executes an asynchronous operation
@@ -152,9 +159,11 @@ func (e *Execution) Execute(ctx context.Context) error {
 	return err
 }
 
-// ResolveExecution is not yet implemented
+// ResolveExecution resolves inputs and artifacts before the execution of an operation
 func (e *Execution) ResolveExecution(ctx context.Context) error {
-	return nil
+	log.Debugf("Preparing execution of operation %q on node %q for deployment %q", e.Operation.Name, e.NodeName, e.DeploymentID)
+
+	return e.resolveInputs(ctx)
 }
 
 func (e *Execution) createJob(ctx context.Context) error {
@@ -163,6 +172,38 @@ func (e *Execution) createJob(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	tasksParamsStr := e.getValueFromEnvInputs(tasksParamsEnvVar)
+
+	var tasksParams map[string][]heappe.CommandTemplateParameterValue
+
+	if tasksParamsStr != "" {
+		data, err := base64.StdEncoding.DecodeString(tasksParamsStr)
+		if err != nil {
+			fmt.Println("error:", err)
+			return errors.Wrapf(err, "Error base64 decoding tasks parameters values %s", tasksParamsStr)
+		}
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Runtime tasks data %s", data)
+		err = json.Unmarshal([]byte(data), &tasksParams)
+		if err != nil {
+			log.Printf("Got error unmarshaling Runtime tasks parameters: %+s\n", err.Error())
+			return errors.Wrapf(err, "Error unmarshaling runtime tasks parameters %s", tasksParamsStr)
+		}
+	}
+
+	// Update tasks parameters in job specification
+	for i, task := range jobSpec.Tasks {
+		val, ok := tasksParams[task.Name]
+		if ok {
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+				"Setting task %s parameters computed at runtime: %+v ", task.Name, val)
+			jobSpec.Tasks[i].TemplateParameterValues = val
+		}
+	}
+
+	events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+		"Creating job %+v ", jobSpec)
 
 	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName)
 	if err != nil {
@@ -194,6 +235,28 @@ func (e *Execution) createJob(ctx context.Context) error {
 		return err
 	}
 
+	return err
+}
+
+func (e *Execution) getValueFromEnvInputs(envVar string) string {
+
+	var result string
+	for _, envInput := range e.EnvInputs {
+		if envInput.Name == envVar {
+			result = envInput.Value
+			break
+		}
+	}
+	return result
+
+}
+
+func (e *Execution) resolveInputs(ctx context.Context) error {
+	var err error
+	log.Debugf("Get environment inputs for node:%q", e.NodeName)
+	e.EnvInputs, e.VarInputsNames, err = operations.ResolveInputsWithInstances(
+		ctx, e.DeploymentID, e.NodeName, e.TaskID, e.Operation, nil, nil)
+	log.Debugf("Environment inputs: %v", e.EnvInputs)
 	return err
 }
 

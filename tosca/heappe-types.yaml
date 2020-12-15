@@ -254,6 +254,24 @@ node_types:
     derived_from: org.heappe.nodes.pub.Job
     description: >
       HEAppE Job
+  org.heappe.nodes.JobWithRuntimeTaskParameters:
+    derived_from: org.heappe.nodes.pub.Job
+    description: >
+      HEAppE Job where tasks parameters are provided by another compoent
+    requirements:
+      - tasks_parameters_provider:
+          capability: org.heappe.capabilities.TasksParametersProvider
+          node: tosca.nodes.Root
+          relationship: org.heappe.relationships.TasksParametersProvider
+          occurrences: [1, 1]
+    interfaces:
+      Standard:
+        create:
+          inputs:
+            TASKS_PARAMETERS: { get_attribute: [REQ_TARGET, tasks_parameters_provider, tasks_parameters] }
+          implementation:
+            file: "embedded"
+            type: org.heappe.artifacts.Deployment
   org.heappe.nodes.pub.WaitFileAndGetContentJob:
     derived_from: org.alien4cloud.nodes.Job
     abstract: true
@@ -408,16 +426,29 @@ capability_types:
       filecontent:
         type: string
         description: File content
+  org.heappe.capabilities.TasksParametersProvider:
+    derived_from: tosca.capabilities.Root
+    description: >
+      A capability providing tasks parameters to a job.
+    attributes:
+      tasks_parameters:
+        type: string
+        description: |
+          Base64-encoded string of a json map of tasks parameters.
+          Example: {"FirstTask": [{"CommandParameterIdentifier": "param1", "ParameterValue": "value1"}]}
 relationship_types:
   org.heappe.relationships.DependsOnJob:
     derived_from: tosca.relationships.DependsOn
     description: Relationship between a component and a HEAppE job
-    valid_target_types: [ org.heappe.nodes.Job ]
+    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
   org.heappe.relationships.SendInputsToJob:
     derived_from: tosca.relationships.DependsOn
   org.heappe.relationships.GetResultsFromJob:
     derived_from: tosca.relationships.DependsOn
   org.heappe.relationships.FileContent:
     derived_from: tosca.relationships.DependsOn
-    valid_target_types: [ org.heappe.nodes.pub.Job ]
+    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
+  org.heappe.relationships.TasksParametersProvider:
+    derived_from: tosca.relationships.DependsOn
+    valid_target_types: [ org.heappe.capabilities.TasksParametersProvider ]
  

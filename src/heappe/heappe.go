@@ -129,7 +129,7 @@ func (h *heappeClient) CreateJob(job JobSpecification) (JobInfo, error) {
 	}
 
 	createStr, _ := json.Marshal(params)
-	log.Printf("LOLO Creating job %s", string(createStr))
+	log.Debugf("Creating job %s", string(createStr))
 
 	err = h.httpClient.doRequest(http.MethodPost, heappeCreateJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
