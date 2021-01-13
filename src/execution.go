@@ -76,6 +76,12 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		monitoringTimeInterval = locationDefaultMonitoringTimeInterval
 	}
 
+	token, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
+		nodeName, "token")
+	if err != nil {
+		return exec, err
+	}
+
 	if isJob {
 		exec = &job.Execution{
 			KV:                     kv,
@@ -83,6 +89,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			DeploymentID:           deploymentID,
 			TaskID:                 taskID,
 			NodeName:               nodeName,
+			Token:                  token,
 			Operation:              operation,
 			MonitoringTimeInterval: monitoringTimeInterval,
 		}
@@ -123,6 +130,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		DeploymentID:           deploymentID,
 		TaskID:                 taskID,
 		NodeName:               nodeName,
+		Token:                  token,
 		Operation:              operation,
 		MonitoringTimeInterval: monitoringTimeInterval,
 	}

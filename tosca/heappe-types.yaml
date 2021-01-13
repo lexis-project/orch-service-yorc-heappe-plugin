@@ -2,7 +2,7 @@ tosca_definitions_version: yorc_tosca_simple_yaml_1_0
 
 metadata:
   template_name: heappe-types
-  template_version: 1.0.2
+  template_version: 1.0.3
   template_author: yorc
 
 imports:
@@ -188,6 +188,10 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
+      token:
+        description: Access token
+        type: string
+        required: false
       JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
@@ -257,7 +261,12 @@ node_types:
   org.heappe.nodes.JobWithRuntimeTaskParameters:
     derived_from: org.heappe.nodes.pub.Job
     description: >
-      HEAppE Job where tasks parameters are provided by another compoent
+      HEAppE Job where tasks parameters are provided by another component
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     requirements:
       - tasks_parameters_provider:
           capability: org.heappe.capabilities.TasksParametersProvider
@@ -278,6 +287,10 @@ node_types:
     description: >
       Wait for the creation of a file by a given job and get its content(abstract)
     properties:
+      token:
+        description: Access token
+        type: string
+        required: false
       file_path:
         description: Path to the file as reported by the Job list_changed_files operation
         type: string
@@ -330,6 +343,11 @@ node_types:
     abstract: true
     description: >
       Transfer a zipped dataset to a HEAppEJob input files directory (abstract)
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     artifacts:
       - zip_dataset:
           type: tosca.artifacts.File
@@ -368,7 +386,12 @@ node_types:
     derived_from: tosca.nodes.Root
     abstract: true
     description: >
-      Get result files from a HEAppEJob (abstract) 
+      Get result files from a HEAppEJob (abstract)
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     attributes:
       zip_result:
         type: string

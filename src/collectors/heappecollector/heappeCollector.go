@@ -66,7 +66,7 @@ func (h *heappeUsageCollectorDelegate) CollectInfo(ctx context.Context, cfg conf
 		return nil, err
 	}
 
-	heappeClient, err := heappe.GetClient(locationProps)
+	heappeClient, err := heappe.GetClient(locationProps, "")
 	if err != nil {
 		return nil, err
 	}

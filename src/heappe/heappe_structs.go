@@ -42,6 +42,17 @@ type Authentication struct {
 	Credentials PasswordCredentials
 }
 
+// OpenIDCredentials holds an OPenID token and user name to perform a token-based authentication
+type OpenIDCredentials struct {
+	OpenIdAccessToken string
+	Username          string
+}
+
+// Authentication parameters
+type OpenIDAuthentication struct {
+	Credentials OpenIDCredentials
+}
+
 // CommandTemplateParameterValue holds a command template parameter
 type CommandTemplateParameterValue struct {
 	CommandParameterIdentifier string

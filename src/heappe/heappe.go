@@ -26,6 +26,7 @@ import (
 
 const (
 	heappeAuthREST                  = "/heappe/UserAndLimitationManagement/AuthenticateUserPassword"
+	heappeAuthOpenIDREST            = "/heappe/UserAndLimitationManagement/AuthenticateUserOpenId"
 	heappeCreateJobREST             = "/heappe/JobManagement/CreateJob"
 	heappeSubmitJobREST             = "/heappe/JobManagement/SubmitJob"
 	heappeCancelJobREST             = "/heappe/JobManagement/CancelJob"
@@ -67,12 +68,17 @@ type Client interface {
 }
 
 // GetClient returns a HEAppE client for a given location
-func GetClient(locationProps config.DynamicMap) (Client, error) {
+func GetClient(locationProps config.DynamicMap, token string) (Client, error) {
 
 	url := locationProps.GetString(locationURLPropertyName)
 	if url == "" {
 		return nil, errors.Errorf("No URL defined in HEAppE location configuration")
 	}
+
+	if token != "" {
+		return getOpenIDAuthClient(url, token), nil
+	}
+
 	username := locationProps.GetString(LocationUserPropertyName)
 	if username == "" {
 		return nil, errors.Errorf("No user defined in location")
@@ -80,6 +86,19 @@ func GetClient(locationProps config.DynamicMap) (Client, error) {
 	password := locationProps.GetString(locationPasswordPropertyName)
 
 	return getBasicAuthClient(url, username, password), nil
+}
+
+// getOpenIDAuthClient returns a client performing an OpenID connect token-based authentication
+func getOpenIDAuthClient(url, token string) Client {
+	return &heappeClient{
+		openIDAuth: OpenIDAuthentication{
+			Credentials: OpenIDCredentials{
+				Username:          "YorcUser",
+				OpenIdAccessToken: token,
+			},
+		},
+		httpClient: getHTTPClient(url),
+	}
 }
 
 // getBasicAuthClient returns a client performing a basic user/pasword authentication
@@ -97,6 +116,7 @@ func getBasicAuthClient(url, username, password string) Client {
 
 type heappeClient struct {
 	auth       Authentication
+	openIDAuth OpenIDAuthentication
 	sessionID  string
 	httpClient *httpclient
 }
@@ -471,8 +491,13 @@ func (h *heappeClient) GetCurrentClusterNodeUsage(nodeID int64) (ClusterNodeUsag
 
 func (h *heappeClient) authenticate() (string, error) {
 	var sessionID string
+	var err error
 
-	err := h.httpClient.doRequest(http.MethodPost, heappeAuthREST, http.StatusOK, h.auth, &sessionID)
+	if h.openIDAuth.Credentials.OpenIdAccessToken != "" {
+		err = h.httpClient.doRequest(http.MethodPost, heappeAuthOpenIDREST, http.StatusOK, h.openIDAuth, &sessionID)
+	} else {
+		err = h.httpClient.doRequest(http.MethodPost, heappeAuthREST, http.StatusOK, h.auth, &sessionID)
+	}
 	if err != nil {
 		return sessionID, errors.Wrap(err, "Failed to authenticate to HEAppE")
 	}
