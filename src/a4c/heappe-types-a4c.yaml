@@ -2,7 +2,7 @@ tosca_definitions_version: alien_dsl_2_0_0
 
 metadata:
   template_name: heappe-types
-  template_version: 1.0.2
+  template_version: 1.0.3
   template_author: yorc
 
 imports:
@@ -209,6 +209,10 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
+      token:
+        description: Access token
+        type: string
+        required: false
       JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
@@ -282,7 +286,12 @@ node_types:
   org.heappe.nodes.JobWithRuntimeTaskParameters:
     derived_from: org.heappe.nodes.pub.Job
     description: >
-      HEAppE Job where tasks parameters are provided by another compoent
+      HEAppE Job where tasks parameters are provided by another component
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     requirements:
       - tasks_parameters_provider:
           capability: org.heappe.capabilities.TasksParametersProvider
@@ -303,6 +312,10 @@ node_types:
     description: >
       Wait for the creation of a file by a given job and get its content(abstract)
     properties:
+      token:
+        description: Access token
+        type: string
+        required: false
       file_path:
         description: Path to the file as reported by the Job list_changed_files operation
         type: string
@@ -357,6 +370,11 @@ node_types:
     abstract: true
     description: >
       Transfer a zipped dataset to a HEAppEJob input files directory (abstract)
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     artifacts:
       - zip_dataset:
           type: tosca.artifacts.File
@@ -397,6 +415,11 @@ node_types:
     abstract: true
     description: >
       Get result files from a HEAppEJob (abstract) 
+    properties:
+      token:
+        description: Access token
+        type: string
+        required: false
     attributes:
       zip_result:
         type: string
@@ -436,48 +459,6 @@ node_types:
     derived_from: org.heappe.nodes.pub.Results
     description: >
       Get result files from a HEAppEJob
-  org.heappe.nodes.pub.CopyResults:
-    derived_from: tosca.nodes.SoftwareComponent
-    abstract: true
-    description: >
-      Copy HEAppE Job results on host (abstract) 
-    properties:
-      destination_dir:
-        type: string
-        description: >
-          Destination directory where to copy files
-        required: true
-    requirements:
-      - job_results:
-          capability: org.heappe.capabilities.HeappeJobResults
-          node: org.heappe.nodes.pub.Results
-          relationship: org.heappe.relationships.CopyResults
-          occurrences: [1, 1]
-    interfaces:
-      Standard:
-        create:
-          implementation:
-            file: heappe-types-a4c.yaml
-            type: tosca.artifacts.Deployment.Image.Container.Docker
-        delete:
-          implementation:
-            file: heappe-types-a4c.yaml
-            type: tosca.artifacts.Deployment.Image.Container.Docker
-      Custom:
-        copyResults:
-          inputs:
-            ZIP_SRC: { get_attribute: [REQ_TARGET, job_results, zip_result] }
-            DEST_DIR: { get_property: [SELF, destination_dir] }
-          implementation:
-            file: heappe-types-a4c.yaml
-            type: tosca.artifacts.Deployment.Image.Container.Docker
-    tags:
-      icon: /images/heappecopy.png
-  org.heappe.nodes.CopyResults:
-    derived_from: org.heappe.nodes.pub.CopyResults
-    description: >
-      Copy HEAppE Job results on host
-
 capability_types:
   org.heappe.capabilities.HeappeJob:
     derived_from: tosca.capabilities.Root
