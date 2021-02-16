@@ -163,7 +163,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		// job has been done successfully : unregister monitoring
 		deregister = true
 	case jobStatePending:
-		// Not yet runninh: monitoring is keeping on (deregister stays false)
+		// Not yet running: monitoring is keeping on (deregister stays false)
 	case jobStateRunning:
 		// job is still running : monitoring is keeping on (deregister stays false)
 		if listChangedFilesWhileRunning {
@@ -171,6 +171,17 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 			if err != nil {
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
 			}
+		}
+		// Update the submit date the first time this job is seen running
+		if previousJobState != jobState {
+			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+				submitDateConsulAttribute, jobInfo.SubmitTime)
+			if updateErr != nil {
+				log.Printf("Failed to set job submission date %s for Job %s ID %d: %s",
+					jobInfo.SubmitTime, actionData.nodeName, actionData.jobID, updateErr.Error())
+				err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store empty submission date", jobInfo.ID)
+			}
+
 		}
 	default:
 		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
@@ -343,8 +354,8 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 	}
 
 	var foundFile bool
-	for _, filePath := range changedFiles {
-		if filePath == actionData.filePath {
+	for _, changedFile := range changedFiles {
+		if changedFile.FileName == actionData.filePath {
 			foundFile = true
 			break
 		}

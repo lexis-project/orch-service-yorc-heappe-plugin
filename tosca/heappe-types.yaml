@@ -19,6 +19,24 @@ data_types:
       ParameterValue:
         description: Command parameter value
         type: string
+  org.heappe.types.TaskParalizationParameter:
+    derived_from: tosca.datatypes.Root
+    properties:
+      MPIProcesses:
+        description: Number of MPI processes
+        type: integer
+        required: false
+        default: 0
+      OpenMPThreads:
+        description: Numbre of penMP threads
+        type: integer
+        required: false
+        default: 0
+      MaxCores:
+        description: Maximum number of cores
+        type: integer
+        required: false
+        default: 0
   org.heappe.types.EnvironmentVariable:
     derived_from: tosca.datatypes.Root
     properties:
@@ -66,6 +84,12 @@ data_types:
         description: Job priority
         type: integer
         default: 4
+      TaskParalizationParameters:
+        description: Task parallelization parameters
+        type: list
+        entry_schema:
+          type: org.heappe.types.TaskParalizationParameter
+        required: false
       EnvironmentVariables:
         description: Environment variables
         type: list
@@ -74,7 +98,10 @@ data_types:
         required: false
       RequiredNodes:
         description: Required nodes
-        type: string
+        type: list
+        entry_schema:
+          type: string
+        required: false
       JobArrays:
         description: Job arrays
         type: string
@@ -159,6 +186,17 @@ data_types:
         description: Send an email notification on job start
         type: boolean
         default: false
+  org.heappe.types.ChangedFile:
+    derived_from: tosca.datatypes.Root
+    properties:
+      FileName:
+        type: string
+        description: >
+          Name of a file created/updated by a HEAppE job
+      lastModifiedDate:
+        type: string
+        description: >
+          Last modified date of this file
   org.heappe.types.FileTransfer:
     derived_from: tosca.datatypes.Root
     properties:
@@ -210,11 +248,14 @@ node_types:
         type: org.heappe.types.FileTransfer
         description: >
           File transfer settings
+      submit_date:
+        type: string
+        description: Date of job submission as reported by HEAppE (empty id not yet submitted)
       changed_files:
         type: list
         entry_schema:
-          description: List of files created or changed by the job execution
-          type: string
+          type: org.heappe.types.ChangedFile
+        description: List of files created or changed by the job execution with their last modification data
       tasks_name_id:
         type: map
         description: Map of task name - task ID
