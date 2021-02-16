@@ -188,14 +188,19 @@ node_types:
     description: >
       HEAppE Job (abstract)
     properties:
-      token:
-        description: Access token
-        type: string
-        required: false
       JobSpecification:
         description: Specification of the job to create
         type: org.heappe.types.JobSpecification
         required: true
+      token:
+        description: Access token
+        type: string
+        required: false
+      listChangedFilesWhileRunning:
+        description: Update the attribute changed_files while the job is running
+        type: boolean
+        required: false
+        default: false
     attributes:
       job_id:
         type: string

@@ -83,6 +83,13 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	}
 
 	if isJob {
+
+		listFiles, err := deployments.GetBooleanNodeProperty(ctx, deploymentID,
+			nodeName, "listChangedFilesWhileRunning")
+		if err != nil {
+			return exec, err
+		}
+
 		exec = &job.Execution{
 			KV:                     kv,
 			Cfg:                    cfg,
@@ -90,6 +97,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			TaskID:                 taskID,
 			NodeName:               nodeName,
 			Token:                  token,
+			ListFilesWhileRunning:  listFiles,
 			Operation:              operation,
 			MonitoringTimeInterval: monitoringTimeInterval,
 		}

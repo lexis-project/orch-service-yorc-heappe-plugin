@@ -43,6 +43,7 @@ const (
 	enableFileTransferOperation   = "custom.enable_file_transfer"
 	disableFileTransferOperation  = "custom.disable_file_transfer"
 	listChangedFilesOperation     = "custom.list_changed_files"
+	listChangedFilesAction        = "listChangedFilesAction"
 	jobSpecificationProperty      = "JobSpecification"
 	infrastructureType            = "heappe"
 	jobIDConsulAttribute          = "job_id"
@@ -65,6 +66,7 @@ type Execution struct {
 	TaskID                 string
 	NodeName               string
 	Token                  string
+	ListFilesWhileRunning  bool
 	Operation              prov.Operation
 	MonitoringTimeInterval time.Duration
 	EnvInputs              []*operations.EnvInput
@@ -87,6 +89,7 @@ func (e *Execution) ExecuteAsync(ctx context.Context) (*prov.Action, time.Durati
 	data["nodeName"] = e.NodeName
 	data["jobID"] = strconv.FormatInt(jobID, 10)
 	data["token"] = e.Token
+	data[listChangedFilesAction] = strconv.FormatBool(e.ListFilesWhileRunning)
 
 	return &prov.Action{ActionType: "heappe-job-monitoring", Data: data}, e.MonitoringTimeInterval, err
 }

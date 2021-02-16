@@ -122,6 +122,11 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		return true, errors.Errorf("Missing mandatory information taskID for actionType:%q", action.ActionType)
 	}
 
+	listChangedFilesWhileRunning := false
+	boolStr, ok := action.Data[listChangedFilesAction]
+	if ok {
+		listChangedFilesWhileRunning, _ = strconv.ParseBool(boolStr)
+	}
 	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["token"])
 	if err != nil {
 		return true, err
@@ -157,8 +162,16 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	case jobStateCompleted:
 		// job has been done successfully : unregister monitoring
 		deregister = true
-	case jobStatePending, jobStateRunning:
-		// job's still running or its state is about to be set definitively: monitoring is keeping on (deregister stays false)
+	case jobStatePending:
+		// Not yet runninh: monitoring is keeping on (deregister stays false)
+	case jobStateRunning:
+		// job is still running : monitoring is keeping on (deregister stays false)
+		if listChangedFilesWhileRunning {
+			updateErr := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+			if err != nil {
+				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
+			}
+		}
 	default:
 		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
 		deregister = true
