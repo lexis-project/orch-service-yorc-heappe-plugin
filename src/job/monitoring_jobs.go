@@ -175,11 +175,10 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		// Update the submit date the first time this job is seen running
 		if previousJobState != jobState {
 			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
-				submitDateConsulAttribute, jobInfo.SubmitTime)
+				startDateConsulAttribute, jobInfo.StartTime)
 			if updateErr != nil {
-				log.Printf("Failed to set job submission date %s for Job %s ID %d: %s",
+				log.Printf("Failed to set job start date %s for Job %s ID %d: %s",
 					jobInfo.SubmitTime, actionData.nodeName, actionData.jobID, updateErr.Error())
-				err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store empty submission date", jobInfo.ID)
 			}
 
 		}
@@ -250,8 +249,8 @@ func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.
 			tOffset.FileType = int(fType)
 			tOffset.Offset, err = getOffset(jobInfo.ID, task.ID, tOffset.FileType, action)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to compute offset for log file on deployment %s node %s job %d ",
-					deploymentID, nodeName, jobInfo.ID)
+				return errors.Wrapf(err, "Failed to compute offset for log file on deployment %s node %s job %d offset %+v",
+					deploymentID, nodeName, jobInfo.ID, tOffset)
 			}
 
 			offsets = append(offsets, tOffset)

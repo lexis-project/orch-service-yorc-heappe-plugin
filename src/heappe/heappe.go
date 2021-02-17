@@ -284,7 +284,7 @@ func (h *heappeClient) DownloadPartsOfJobFilesFromCluster(jobID int64, offsets [
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeDownloadPartsREST, http.StatusOK, params, &contents)
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to download part of job outputs for job %d", jobID)
+		err = errors.Wrapf(err, "Failed to download part of job outputs for job %d, request %+v", jobID, params)
 	}
 
 	return contents, err

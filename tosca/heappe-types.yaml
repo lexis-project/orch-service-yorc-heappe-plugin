@@ -162,7 +162,7 @@ data_types:
         type: integer
         default: 0
       FileTransferMethodId:
-        description: File transfer method (1 for NetworkShare, 2 for SftpScp)
+        description: File transfer method (1 for NetworkShare, 2 or 3 for SftpScp, set by the orchestrator according to the cluster ID)
         type: integer
         default: 2
         required: false
@@ -248,9 +248,9 @@ node_types:
         type: org.heappe.types.FileTransfer
         description: >
           File transfer settings
-      submit_date:
+      start_date:
         type: string
-        description: Date of job submission as reported by HEAppE (empty id not yet submitted)
+        description: Date of job start as reported by HEAppE (empty if not yet running)
       changed_files:
         type: list
         entry_schema:
