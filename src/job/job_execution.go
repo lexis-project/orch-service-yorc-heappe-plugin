@@ -54,7 +54,7 @@ const (
 	transferConsulAttribute       = "file_transfer"
 	transferObjectConsulAttribute = "transfer_object"
 	tasksNameIDConsulAttribute    = "tasks_name_id"
-	submitDateConsulAttribute     = "submit_date"
+	startDateConsulAttribute      = "start_date"
 	changedFilesConsulAttribute   = "changed_files"
 	tasksParamsEnvVar             = "TASKS_PARAMETERS"
 )
@@ -240,9 +240,9 @@ func (e *Execution) createJob(ctx context.Context) error {
 		return err
 	}
 
-	// Submission date is not yet defined
+	// Start date is not yet defined
 	err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
-		submitDateConsulAttribute, "")
+		startDateConsulAttribute, "")
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store empty submission date", jobInfo.ID)
 	}
@@ -503,6 +503,10 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 			return jobSpec, err
 		}
 	}
+
+	// Currently, the job file transfer method equals the cluster ID
+	// so overriding its definition here
+	jobSpec.FileTransferMethodID = jobSpec.ClusterID
 
 	var boolPropNames = []struct {
 		field    *bool
