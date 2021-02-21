@@ -240,11 +240,26 @@ func (e *Execution) createJob(ctx context.Context) error {
 		return err
 	}
 
-	// Start date is not yet defined
+	// Start date is not yet defined, but initializing this value for
+	// components related to this job which would check this attribute value
 	err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
 		startDateConsulAttribute, "")
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store empty submission date", jobInfo.ID)
+	}
+
+	// Changed files is not yet defined, but initializing this value for
+	// components related to this job which would check this attribute value
+	changedFiles := make([]heappe.ChangedFile, 0)
+	if err != nil {
+		return err
+	}
+
+	err = deployments.SetAttributeComplexForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		changedFilesConsulAttribute, changedFiles)
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d, failed to store list of changed files", jobInfo.ID)
+		return err
 	}
 
 	return err

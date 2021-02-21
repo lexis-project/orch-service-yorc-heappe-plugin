@@ -193,7 +193,7 @@ data_types:
         type: string
         description: >
           Name of a file created/updated by a HEAppE job
-      lastModifiedDate:
+      LastModifiedDate:
         type: string
         description: >
           Last modified date of this file

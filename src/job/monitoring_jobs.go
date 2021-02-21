@@ -172,7 +172,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
 			}
 		}
-		// Update the submit date the first time this job is seen running
+		// Update the start date the first time this job is seen running
 		if previousJobState != jobState {
 			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
 				startDateConsulAttribute, jobInfo.StartTime)
