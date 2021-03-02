@@ -1,7 +1,7 @@
 tosca_definitions_version: alien_dsl_2_0_0
 
 metadata:
-  template_name: HEAppETest
+  template_name: org.lexis.common.heappe.HEAppETest
   template_version: 0.1.0-SNAPSHOT
   template_author: yorc
 
@@ -12,7 +12,7 @@ imports:
   - tosca-normative-types:1.0.0-ALIEN20
   - docker-types:2.2.0-SM9
   - alien-base-types:2.2.0-SM9
-  - heappe-types:0.1.0
+  - org.lexis.common.heappe-types:0.1.0
   - org.ystia.docker.containers.docker.generic:2.2.0-SNAPSHOT
   - org.ystia.docker.ansible:2.2.0-SNAPSHOT
 
@@ -22,7 +22,7 @@ topology_template:
         type: tosca.artifacts.File
   node_templates:
     TestJob:
-      type: org.heappe.nodes.Job
+      type: org.lexis.common.heappe.nodes.Job
       properties:
         JobSpecification: 
           name: testJobName
@@ -47,7 +47,7 @@ topology_template:
               progressFile: "console_Stdprog"
               logFile: "console_Stdlog"
     Dataset:
-      type: org.heappe.nodes.Dataset
+      type: org.lexis.common.heappe.nodes.Dataset
       artifacts:
         zip_dataset:
           file: { get_input_artifact: zip_dataset }
@@ -56,16 +56,16 @@ topology_template:
         - dependsOnHeappejob:
             type_requirement: job
             node: TestJob
-            capability: org.heappe.capabilities.HeappeJob
-            relationship: org.heappe.relationships.SendInputsToJob
+            capability: org.lexis.common.heappe.capabilities.HeappeJob
+            relationship: org.lexis.common.heappe.relationships.SendInputsToJob
     Results:
-      type: org.heappe.nodes.Results
+      type: org.lexis.common.heappe.nodes.Results
       requirements:
         - dependsOnHeappejob:
             type_requirement: job
             node: TestJob
-            capability: org.heappe.capabilities.HeappeJob
-            relationship: org.heappe.relationships.GetResultsFromJob
+            capability: org.lexis.common.heappe.capabilities.HeappeJob
+            relationship: org.lexis.common.heappe.relationships.GetResultsFromJob
     PublicNet:
       type: tosca.nodes.Network
       properties:
@@ -91,7 +91,7 @@ topology_template:
             network_name: PRIVATE
             initiator: source
     CopyResults:
-      type: org.heappe.nodes.CopyResults
+      type: org.lexis.common.heappe.nodes.CopyResults
       properties:
         destination_dir: /home/centos/
       requirements:
@@ -103,8 +103,8 @@ topology_template:
         - dependsOnJobResults:
             type_requirement: job_results
             node: Results
-            capability: org.heappe.capabilities.HeappeJobResults
-            relationship: org.heappe.relationships.CopyResults
+            capability: org.lexis.common.heappe.capabilities.HeappeJobResults
+            relationship: org.lexis.common.heappe.relationships.CopyResults
     Docker:
       type: org.ystia.docker.ansible.nodes.Docker
       properties:
