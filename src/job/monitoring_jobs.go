@@ -71,23 +71,11 @@ func (o *ActionOperator) ExecAction(ctx context.Context, cfg config.Configuratio
 	log.Debugf("Execute Action with ID:%q, taskID:%q, deploymentID:%q", action.ID, taskID, deploymentID)
 
 	if action.ActionType == "heappe-job-monitoring" {
-		deregister, err := o.monitorJob(ctx, cfg, deploymentID, action)
-		if err != nil {
-			// action scheduling needs to be unregistered
-			return true, err
-		}
-
-		return deregister, nil
+		return o.monitorJob(ctx, cfg, deploymentID, action)
 	}
 
 	if action.ActionType == "heappe-filecontent-monitoring" {
-		deregister, err := o.getFileContent(ctx, cfg, deploymentID, action)
-		if err != nil {
-			// action scheduling needs to be unregistered
-			return true, err
-		}
-
-		return deregister, nil
+		return o.getFileContent(ctx, cfg, deploymentID, action)
 	}
 
 	return true, errors.Errorf("Unsupported actionType %q", action.ActionType)
@@ -140,7 +128,14 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 
 	jobInfo, err := heappeClient.GetJobInfo(actionData.jobID)
 	if err != nil {
-		return true, err
+		// Be resilient to temporary gateway errors here while a job is running
+		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
+			strings.Contains(err.Error(), "504 Gateway Time-out")
+
+		if nonFatalError {
+			log.Printf("Ignoring non fatal gateway error trying to get job info: %s", err.Error())
+		}
+		return !nonFatalError, err
 	}
 
 	if actionData.sessionID == "" {
