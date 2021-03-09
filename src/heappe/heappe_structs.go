@@ -65,29 +65,37 @@ type EnvironmentVariable struct {
 	Value string
 }
 
+// TaskParalizationParameter holds paramters of tasks parallelization
+type TaskParalizationParameter struct {
+	MPIProcesses  int
+	OpenMPThreads int
+	MaxCores      int
+}
+
 // TaskSpecification holds task properties
 type TaskSpecification struct {
-	Name                    string
-	MinCores                int
-	MaxCores                int
-	WalltimeLimit           int
-	RequiredNodes           string
-	Priority                int
-	JobArrays               string
-	IsExclusive             bool
-	IsRerunnable            bool
-	CpuHyperThreading       bool
-	StandardInputFile       string
-	StandardOutputFile      string
-	StandardErrorFile       string
-	ProgressFile            string
-	LogFile                 string
-	ClusterTaskSubdirectory string
-	ClusterNodeTypeID       int `json:"ClusterNodeTypeId"`
-	CommandTemplateID       int `json:"CommandTemplateId"`
-	EnvironmentVariables    []EnvironmentVariable
+	Name                       string
+	MinCores                   int
+	MaxCores                   int
+	WalltimeLimit              int
+	RequiredNodes              []string `json:"RequiredNodes,omitempty"`
+	Priority                   int
+	JobArrays                  string
+	IsExclusive                bool
+	IsRerunnable               bool
+	CpuHyperThreading          bool
+	StandardInputFile          string
+	StandardOutputFile         string
+	StandardErrorFile          string
+	ProgressFile               string
+	LogFile                    string
+	ClusterTaskSubdirectory    string
+	ClusterNodeTypeID          int                         `json:"ClusterNodeTypeId"`
+	CommandTemplateID          int                         `json:"CommandTemplateId"`
+	TaskParalizationParameters []TaskParalizationParameter `json:"TaskParalizationParameters,omitempty"`
+	EnvironmentVariables       []EnvironmentVariable       `json:"EnvironmentVariables,omitempty"`
 	// TODO: DependsOn
-	TemplateParameterValues []CommandTemplateParameterValue
+	TemplateParameterValues []CommandTemplateParameterValue `json:"TemplateParameterValues,omitempty"`
 }
 
 // JobSpecification holds job properties
@@ -102,7 +110,6 @@ type JobSpecification struct {
 	NotifyOnStart        bool
 	ClusterID            int `json:"ClusterId"`
 	FileTransferMethodID int `json:"FileTransferMethodId"`
-	EnvironmentVariables []EnvironmentVariable
 	Tasks                []TaskSpecification
 }
 
@@ -157,7 +164,7 @@ type TaskInfo struct {
 	State             int
 	Priority          int
 	AllocatedTime     float64
-	AllocatedCoreIds  string
+	AllocatedCoreIds  []string
 	StartTime         string
 	EndTime           string
 	NodeType          ClusterNodeType
@@ -232,6 +239,12 @@ type DownloadFileRESTParams struct {
 	SubmittedJobInfoID int64 `json:"SubmittedJobInfoId"`
 	RelativeFilePath   string
 	SessionCode        string
+}
+
+// ChangedFile holds properties of a file created/updated by a HEAppeJob
+type ChangedFile struct {
+	FileName         string
+	LastModifiedDate string
 }
 
 // ListAdaptorUserGroupsRESTParams holds parameters used in the REST API call to

@@ -32,10 +32,10 @@ const (
 	heappeInfrastructureType              = "heappe"
 	locationJobMonitoringTimeInterval     = "job_monitoring_time_interval"
 	locationDefaultMonitoringTimeInterval = 5 * time.Second
-	heappeJobType                         = "org.heappe.nodes.pub.Job"
-	heappeSendDatasetType                 = "org.heappe.nodes.Dataset"
-	heappeReceiveDatasetType              = "org.heappe.nodes.Results"
-	heappeWaitFileGetContent              = "org.heappe.nodes.WaitFileAndGetContentJob"
+	heappeJobType                         = "org.lexis.common.heappe.nodes.pub.Job"
+	heappeSendDatasetType                 = "org.lexis.common.heappe.nodes.Dataset"
+	heappeReceiveDatasetType              = "org.lexis.common.heappe.nodes.Results"
+	heappeWaitFileGetContent              = "org.lexis.common.heappe.nodes.WaitFileAndGetContentJob"
 )
 
 // Execution is the interface holding functions to execute an operation

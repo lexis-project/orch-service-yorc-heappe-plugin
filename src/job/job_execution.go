@@ -54,6 +54,7 @@ const (
 	transferConsulAttribute       = "file_transfer"
 	transferObjectConsulAttribute = "transfer_object"
 	tasksNameIDConsulAttribute    = "tasks_name_id"
+	startDateConsulAttribute      = "start_date"
 	changedFilesConsulAttribute   = "changed_files"
 	tasksParamsEnvVar             = "TASKS_PARAMETERS"
 )
@@ -236,6 +237,28 @@ func (e *Execution) createJob(ctx context.Context) error {
 		tasksNameId)
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d, failed to store taskIDs details", jobInfo.ID)
+		return err
+	}
+
+	// Start date is not yet defined, but initializing this value for
+	// components related to this job which would check this attribute value
+	err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		startDateConsulAttribute, "")
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store empty submission date", jobInfo.ID)
+	}
+
+	// Changed files is not yet defined, but initializing this value for
+	// components related to this job which would check this attribute value
+	changedFiles := make([]heappe.ChangedFile, 0)
+	if err != nil {
+		return err
+	}
+
+	err = deployments.SetAttributeComplexForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		changedFilesConsulAttribute, changedFiles)
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d, failed to store list of changed files", jobInfo.ID)
 		return err
 	}
 
@@ -496,6 +519,10 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 		}
 	}
 
+	// Currently, the job file transfer method equals the cluster ID
+	// so overriding its definition here
+	jobSpec.FileTransferMethodID = jobSpec.ClusterID
+
 	var boolPropNames = []struct {
 		field    *bool
 		propName string
@@ -548,7 +575,6 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 				consulProp string
 			}{
 				{taskProp: &(task.Name), consulProp: "Name"},
-				{taskProp: &(task.RequiredNodes), consulProp: "RequiredNodes"},
 				{taskProp: &(task.JobArrays), consulProp: "JobArrays"},
 				{taskProp: &(task.StandardInputFile), consulProp: "StandardInputFile"},
 				{taskProp: &(task.StandardOutputFile), consulProp: "StandardOutputFile"},
@@ -623,6 +649,20 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 					}
 					*props.taskProp = (strings.ToLower(val) == "true")
 				}
+			}
+
+			// get required nodes
+			paramsRequiredNodes, ok := attrMap["RequiredNodes"]
+			if ok {
+				paramsArray, ok := paramsRequiredNodes.([]string)
+				if !ok {
+					return jobSpec, errors.Errorf(
+						"failed to retrieve RequiredNodes parameter for deployment %s node %s task %s, wrong type for %+v",
+						e.DeploymentID, e.NodeName, task.Name, paramsRequiredNodes)
+				}
+
+				task.RequiredNodes = paramsArray
+
 			}
 
 			// Get template parameters
@@ -716,6 +756,57 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 					}
 
 					task.EnvironmentVariables = append(task.EnvironmentVariables, param)
+				}
+			}
+
+			// Get task parallelization variables
+			parameters, ok = attrMap["TaskParalizationParameters"]
+			if ok {
+				paramsArray, ok := parameters.([]interface{})
+				if !ok {
+					return jobSpec, errors.Errorf(
+						"failed to retrieve parallelization parameters for deployment %s node %s task %s, wrong type for %+v",
+						e.DeploymentID, e.NodeName, task.Name, parameters)
+				}
+
+				for _, paramsVal := range paramsArray {
+					attrMap, ok := paramsVal.(map[string]interface{})
+					if !ok {
+						return jobSpec, errors.Errorf(
+							"failed to retrieve environment variable for deployment %s node %s task %s, wrong type for %+v",
+							e.DeploymentID, e.NodeName, task.Name, paramsVal)
+					}
+
+					var param heappe.TaskParalizationParameter
+					// Get int properties
+					var paramPropConsulPropInt = []struct {
+						paramProp  *int
+						consulProp string
+					}{
+						{paramProp: &(param.MPIProcesses), consulProp: "MPIProcesses"},
+						{paramProp: &(param.OpenMPThreads), consulProp: "OpenMPThreads"},
+						{paramProp: &(param.MaxCores), consulProp: "MaxCores"},
+					}
+
+					for _, props := range paramPropConsulPropInt {
+						rawValue, ok := attrMap[props.consulProp]
+						if ok {
+							val, ok := rawValue.(string)
+							if !ok {
+								return jobSpec, errors.Errorf(
+									"Expected a string stored for deployment %s node %s task %s property %s, got %+v",
+									e.DeploymentID, e.NodeName, task.Name, props.consulProp, rawValue)
+							}
+							*props.paramProp, err = strconv.Atoi(val)
+							if err != nil {
+								return jobSpec, errors.Wrapf(err,
+									"Cannot convert as an int value %q for deployment %s node %s task %s property %s",
+									val, e.DeploymentID, e.NodeName, task.Name, props.consulProp)
+							}
+						}
+					}
+
+					task.TaskParalizationParameters = append(task.TaskParalizationParameters, param)
 				}
 			}
 

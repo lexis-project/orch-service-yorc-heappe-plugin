@@ -267,14 +267,14 @@ func (e *DatasetTransferExecution) getResultFiles(ctx context.Context) error {
 	}
 
 	// Get list of result files
-	filenames, err := heappeClient.ListChangedFilesForJob(jobID)
+	changedFiles, err := heappeClient.ListChangedFilesForJob(jobID)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("Result files for deployment %s node %s : %+v", e.DeploymentID, e.NodeName, filenames)
+	log.Debugf("Result files for deployment %s node %s : %+v", e.DeploymentID, e.NodeName, changedFiles)
 
-	if len(filenames) == 0 {
+	if len(changedFiles) == 0 {
 		// Nothing to do
 		return err
 	}
@@ -310,10 +310,10 @@ func (e *DatasetTransferExecution) getResultFiles(ctx context.Context) error {
 	defer os.RemoveAll(copyDir)
 
 	// Transfer each file in the dataset
-	for _, filename := range filenames {
+	for _, changedFile := range changedFiles {
 
-		remotePath := filepath.Join(transferMethod.SharedBasepath, filename)
-		localPath := filepath.Join(copyDir, filename)
+		remotePath := filepath.Join(transferMethod.SharedBasepath, changedFile.FileName)
+		localPath := filepath.Join(copyDir, changedFile.FileName)
 		localDir := filepath.Dir(localPath)
 		if localDir != "." {
 			err = os.MkdirAll(localDir, 0700)
@@ -331,10 +331,10 @@ func (e *DatasetTransferExecution) getResultFiles(ctx context.Context) error {
 		stdoutStderr, err := copyCmd.CombinedOutput()
 		if err != nil {
 			log.Printf("Failed to copy remote file: %s - %s", err.Error(), string(stdoutStderr))
-			return errors.Wrapf(err, "Failed to copy remote file %s", filename)
+			return errors.Wrapf(err, "Failed to copy remote file %s", changedFile.FileName)
 		}
 		if len(stdoutStderr) > 0 {
-			log.Debugf("Copy of %s: %s", filename, string(stdoutStderr))
+			log.Debugf("Copy of %s: %s", changedFile.FileName, string(stdoutStderr))
 		}
 	}
 

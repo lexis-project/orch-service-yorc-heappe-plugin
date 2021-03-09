@@ -71,23 +71,11 @@ func (o *ActionOperator) ExecAction(ctx context.Context, cfg config.Configuratio
 	log.Debugf("Execute Action with ID:%q, taskID:%q, deploymentID:%q", action.ID, taskID, deploymentID)
 
 	if action.ActionType == "heappe-job-monitoring" {
-		deregister, err := o.monitorJob(ctx, cfg, deploymentID, action)
-		if err != nil {
-			// action scheduling needs to be unregistered
-			return true, err
-		}
-
-		return deregister, nil
+		return o.monitorJob(ctx, cfg, deploymentID, action)
 	}
 
 	if action.ActionType == "heappe-filecontent-monitoring" {
-		deregister, err := o.getFileContent(ctx, cfg, deploymentID, action)
-		if err != nil {
-			// action scheduling needs to be unregistered
-			return true, err
-		}
-
-		return deregister, nil
+		return o.getFileContent(ctx, cfg, deploymentID, action)
 	}
 
 	return true, errors.Errorf("Unsupported actionType %q", action.ActionType)
@@ -140,7 +128,14 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 
 	jobInfo, err := heappeClient.GetJobInfo(actionData.jobID)
 	if err != nil {
-		return true, err
+		// Be resilient to temporary gateway errors here while a job is running
+		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
+			strings.Contains(err.Error(), "504 Gateway Time-out")
+
+		if nonFatalError {
+			log.Printf("Ignoring non fatal gateway error trying to get job info: %s", err.Error())
+		}
+		return !nonFatalError, err
 	}
 
 	if actionData.sessionID == "" {
@@ -163,7 +158,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		// job has been done successfully : unregister monitoring
 		deregister = true
 	case jobStatePending:
-		// Not yet runninh: monitoring is keeping on (deregister stays false)
+		// Not yet running: monitoring is keeping on (deregister stays false)
 	case jobStateRunning:
 		// job is still running : monitoring is keeping on (deregister stays false)
 		if listChangedFilesWhileRunning {
@@ -171,6 +166,16 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 			if err != nil {
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
 			}
+		}
+		// Update the start date the first time this job is seen running
+		if previousJobState != jobState {
+			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+				startDateConsulAttribute, jobInfo.StartTime)
+			if updateErr != nil {
+				log.Printf("Failed to set job start date %s for Job %s ID %d: %s",
+					jobInfo.SubmitTime, actionData.nodeName, actionData.jobID, updateErr.Error())
+			}
+
 		}
 	default:
 		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
@@ -239,8 +244,8 @@ func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.
 			tOffset.FileType = int(fType)
 			tOffset.Offset, err = getOffset(jobInfo.ID, task.ID, tOffset.FileType, action)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to compute offset for log file on deployment %s node %s job %d ",
-					deploymentID, nodeName, jobInfo.ID)
+				return errors.Wrapf(err, "Failed to compute offset for log file on deployment %s node %s job %d offset %+v",
+					deploymentID, nodeName, jobInfo.ID, tOffset)
 			}
 
 			offsets = append(offsets, tOffset)
@@ -343,8 +348,8 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 	}
 
 	var foundFile bool
-	for _, filePath := range changedFiles {
-		if filePath == actionData.filePath {
+	for _, changedFile := range changedFiles {
+		if changedFile.FileName == actionData.filePath {
 			foundFile = true
 			break
 		}

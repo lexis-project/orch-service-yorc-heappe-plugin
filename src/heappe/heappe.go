@@ -60,7 +60,7 @@ type Client interface {
 	GetFileTransferMethod(jobID int64) (FileTransferMethod, error)
 	EndFileTransfer(jobID int64, ft FileTransferMethod) error
 	DownloadFileFromCluster(jobID int64, filePath string) (string, error)
-	ListChangedFilesForJob(jobID int64) ([]string, error)
+	ListChangedFilesForJob(jobID int64) ([]ChangedFile, error)
 	ListAdaptorUserGroups() ([]AdaptorUserGroup, error)
 	GetUserResourceUsageReport(userID int64, startTime, endTime string) (*UserResourceUsageReport, error)
 	ListAvailableClusters() ([]ClusterInfo, error)
@@ -149,7 +149,7 @@ func (h *heappeClient) CreateJob(job JobSpecification) (JobInfo, error) {
 	}
 
 	createStr, _ := json.Marshal(params)
-	log.Debugf("Creating job %s", string(createStr))
+	log.Printf("Creating job %s", string(createStr))
 
 	err = h.httpClient.doRequest(http.MethodPost, heappeCreateJobREST, http.StatusOK, params, &jobResponse)
 	if err != nil {
@@ -284,7 +284,7 @@ func (h *heappeClient) DownloadPartsOfJobFilesFromCluster(jobID int64, offsets [
 
 	err := h.httpClient.doRequest(http.MethodPost, heappeDownloadPartsREST, http.StatusOK, params, &contents)
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to download part of job outputs for job %d", jobID)
+		err = errors.Wrapf(err, "Failed to download part of job outputs for job %d, request %+v", jobID, params)
 	}
 
 	return contents, err
@@ -367,14 +367,14 @@ func (h *heappeClient) DownloadFileFromCluster(jobID int64, filePath string) (st
 
 }
 
-func (h *heappeClient) ListChangedFilesForJob(jobID int64) ([]string, error) {
+func (h *heappeClient) ListChangedFilesForJob(jobID int64) ([]ChangedFile, error) {
 
-	filenames := make([]string, 0)
+	changedFiles := make([]ChangedFile, 0)
 	if h.sessionID == "" {
 		var err error
 		h.sessionID, err = h.authenticate()
 		if err != nil {
-			return filenames, err
+			return changedFiles, err
 		}
 	}
 
@@ -383,12 +383,12 @@ func (h *heappeClient) ListChangedFilesForJob(jobID int64) ([]string, error) {
 		SessionCode:        h.sessionID,
 	}
 
-	err := h.httpClient.doRequest(http.MethodPost, heappeListChangedFilesREST, http.StatusOK, params, &filenames)
+	err := h.httpClient.doRequest(http.MethodPost, heappeListChangedFilesREST, http.StatusOK, params, &changedFiles)
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to list changed files for job %d", jobID)
 	}
 
-	return filenames, err
+	return changedFiles, err
 
 }
 

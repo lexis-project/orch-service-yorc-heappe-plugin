@@ -1,15 +1,15 @@
 tosca_definitions_version: yorc_tosca_simple_yaml_1_0
 
 metadata:
-  template_name: heappe-types
+  template_name: org.lexis.common.heappe-types
   template_version: 1.0.3
-  template_author: yorc
+  template_author: lexis
 
 imports:
   - <yorc-types.yml>
 
 data_types:
-  org.heappe.types.CommandTemplateParameterValue:
+  org.lexis.common.heappe.types.CommandTemplateParameterValue:
     derived_from: tosca.datatypes.Root
     properties:
       CommandParameterIdentifier :
@@ -19,7 +19,25 @@ data_types:
       ParameterValue:
         description: Command parameter value
         type: string
-  org.heappe.types.EnvironmentVariable:
+  org.lexis.common.heappe.types.TaskParalizationParameter:
+    derived_from: tosca.datatypes.Root
+    properties:
+      MPIProcesses:
+        description: Number of MPI processes
+        type: integer
+        required: false
+        default: 0
+      OpenMPThreads:
+        description: Numbre of penMP threads
+        type: integer
+        required: false
+        default: 0
+      MaxCores:
+        description: Maximum number of cores
+        type: integer
+        required: false
+        default: 0
+  org.lexis.common.heappe.types.EnvironmentVariable:
     derived_from: tosca.datatypes.Root
     properties:
       Name:
@@ -29,7 +47,7 @@ data_types:
       Value:
         description: Environment variable value
         type: string
-  org.heappe.types.TaskSpecification:
+  org.lexis.common.heappe.types.TaskSpecification:
     derived_from: tosca.datatypes.Root
     properties:
       Name:
@@ -48,7 +66,7 @@ data_types:
         description: Command template parameters
         type: list
         entry_schema:
-          type: org.heappe.types.CommandTemplateParameterValue
+          type: org.lexis.common.heappe.types.CommandTemplateParameterValue
         required: false
       WalltimeLimit:
         description: Maximum time for the task to run (in seconds)
@@ -66,15 +84,24 @@ data_types:
         description: Job priority
         type: integer
         default: 4
+      TaskParalizationParameters:
+        description: Task parallelization parameters
+        type: list
+        entry_schema:
+          type: org.lexis.common.heappe.types.TaskParalizationParameter
+        required: false
       EnvironmentVariables:
         description: Environment variables
         type: list
         entry_schema:
-          type: org.heappe.types.EnvironmentVariable
+          type: org.lexis.common.heappe.types.EnvironmentVariable
         required: false
       RequiredNodes:
         description: Required nodes
-        type: string
+        type: list
+        entry_schema:
+          type: string
+        required: false
       JobArrays:
         description: Job arrays
         type: string
@@ -109,7 +136,7 @@ data_types:
       ClusterTaskSubdirectory:
         type: string
         required: false
-  org.heappe.types.JobSpecification:
+  org.lexis.common.heappe.types.JobSpecification:
     derived_from: tosca.datatypes.Root
     properties:
       Name:
@@ -128,14 +155,14 @@ data_types:
         description: Tasks (at leat one task needs to be defined)
         type: list
         entry_schema:
-          type: org.heappe.types.TaskSpecification
+          type: org.lexis.common.heappe.types.TaskSpecification
         required: true
       WaitingLimit:
         description: Limit for the waiting time in cluster queue (seconds)
         type: integer
         default: 0
       FileTransferMethodId:
-        description: File transfer method (1 for NetworkShare, 2 for SftpScp)
+        description: File transfer method (1 for NetworkShare, 2 or 3 for SftpScp, set by the orchestrator according to the cluster ID)
         type: integer
         default: 2
         required: false
@@ -159,7 +186,18 @@ data_types:
         description: Send an email notification on job start
         type: boolean
         default: false
-  org.heappe.types.FileTransfer:
+  org.lexis.common.heappe.types.ChangedFile:
+    derived_from: tosca.datatypes.Root
+    properties:
+      FileName:
+        type: string
+        description: >
+          Name of a file created/updated by a HEAppE job
+      LastModifiedDate:
+        type: string
+        description: >
+          Last modified date of this file
+  org.lexis.common.heappe.types.FileTransfer:
     derived_from: tosca.datatypes.Root
     properties:
       User:
@@ -179,10 +217,10 @@ data_types:
         description: >
           Path on remote server where to store/get job files
 artifact_types:
-  org.heappe.artifacts.Deployment:
+  org.lexis.common.heappe.artifacts.Deployment:
     derived_from: tosca.artifacts.Deployment
 node_types:
-  org.heappe.nodes.pub.Job:
+  org.lexis.common.heappe.nodes.pub.Job:
     derived_from: org.alien4cloud.nodes.Job
     abstract: true
     description: >
@@ -190,7 +228,7 @@ node_types:
     properties:
       JobSpecification:
         description: Specification of the job to create
-        type: org.heappe.types.JobSpecification
+        type: org.lexis.common.heappe.types.JobSpecification
         required: true
       token:
         description: Access token
@@ -207,14 +245,17 @@ node_types:
         description: >
           ID of the HEAppE job created
       file_transfer:
-        type: org.heappe.types.FileTransfer
+        type: org.lexis.common.heappe.types.FileTransfer
         description: >
           File transfer settings
+      start_date:
+        type: string
+        description: Date of job start as reported by HEAppE (empty if not yet running)
       changed_files:
         type: list
         entry_schema:
-          description: List of files created or changed by the job execution
-          type: string
+          type: org.lexis.common.heappe.types.ChangedFile
+        description: List of files created or changed by the job execution with their last modification data
       tasks_name_id:
         type: map
         description: Map of task name - task ID
@@ -222,49 +263,49 @@ node_types:
           type: string
     capabilities:
       heappejob:
-        type: org.heappe.capabilities.HeappeJob
+        type: org.lexis.common.heappe.capabilities.HeappeJob
     interfaces:
       Standard:
         create:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         delete:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
       tosca.interfaces.node.lifecycle.Runnable:
         submit:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         run:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         cancel:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
       custom:
         enable_file_transfer:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         disable_file_transfer:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         list_changed_files:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
-  org.heappe.nodes.Job:
-    derived_from: org.heappe.nodes.pub.Job
+            type: org.lexis.common.heappe.artifacts.Deployment
+  org.lexis.common.heappe.nodes.Job:
+    derived_from: org.lexis.common.heappe.nodes.pub.Job
     description: >
       HEAppE Job
-  org.heappe.nodes.JobWithRuntimeTaskParameters:
-    derived_from: org.heappe.nodes.pub.Job
+  org.lexis.common.heappe.nodes.JobWithRuntimeTaskParameters:
+    derived_from: org.lexis.common.heappe.nodes.pub.Job
     description: >
       HEAppE Job where tasks parameters are provided by another component
     properties:
@@ -274,9 +315,9 @@ node_types:
         required: false
     requirements:
       - tasks_parameters_provider:
-          capability: org.heappe.capabilities.TasksParametersProvider
+          capability: org.lexis.common.heappe.capabilities.TasksParametersProvider
           node: tosca.nodes.Root
-          relationship: org.heappe.relationships.TasksParametersProvider
+          relationship: org.lexis.common.heappe.relationships.TasksParametersProvider
           occurrences: [1, 1]
     interfaces:
       Standard:
@@ -285,8 +326,8 @@ node_types:
             TASKS_PARAMETERS: { get_attribute: [REQ_TARGET, tasks_parameters_provider, tasks_parameters] }
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
-  org.heappe.nodes.pub.WaitFileAndGetContentJob:
+            type: org.lexis.common.heappe.artifacts.Deployment
+  org.lexis.common.heappe.nodes.pub.WaitFileAndGetContentJob:
     derived_from: org.alien4cloud.nodes.Job
     abstract: true
     description: >
@@ -306,44 +347,44 @@ node_types:
         description: Content of the file
     capabilities:
       filecontent:
-        type: org.heappe.capabilities.FileContent
+        type: org.lexis.common.heappe.capabilities.FileContent
     requirements:
       - job:
-          capability: org.heappe.capabilities.HeappeJob
-          node: org.heappe.nodes.pub.Job
-          relationship: org.heappe.relationships.FileContent
+          capability: org.lexis.common.heappe.capabilities.HeappeJob
+          node: org.lexis.common.heappe.nodes.pub.Job
+          relationship: org.lexis.common.heappe.relationships.FileContent
           occurrences: [1, 1]
     interfaces:
       Standard:
         create:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         delete:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
       tosca.interfaces.node.lifecycle.Runnable:
         submit:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         run:
           inputs:
             JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
             FILE_PATH: { get_property: [SELF, file_path] }
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         cancel:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
-  org.heappe.nodes.WaitFileAndGetContentJob:
-    derived_from: org.heappe.nodes.pub.WaitFileAndGetContentJob
+            type: org.lexis.common.heappe.artifacts.Deployment
+  org.lexis.common.heappe.nodes.WaitFileAndGetContentJob:
+    derived_from: org.lexis.common.heappe.nodes.pub.WaitFileAndGetContentJob
     description: >
       Wait for the creation of files from a given job
-  org.heappe.nodes.pub.Dataset:
+  org.lexis.common.heappe.nodes.pub.Dataset:
     derived_from: tosca.nodes.Root
     abstract: true
     description: >
@@ -359,9 +400,9 @@ node_types:
           file: "embedded"
     requirements:
       - job:
-          capability: org.heappe.capabilities.HeappeJob
-          node: org.heappe.nodes.Job
-          relationship: org.heappe.relationships.SendInputsToJob
+          capability: org.lexis.common.heappe.capabilities.HeappeJob
+          node: org.lexis.common.heappe.nodes.Job
+          relationship: org.lexis.common.heappe.relationships.SendInputsToJob
           occurrences: [1, 1]
     interfaces:
       Standard:
@@ -370,11 +411,11 @@ node_types:
             JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         delete:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
       Custom:
         sendJobInputs:
           inputs:
@@ -382,12 +423,12 @@ node_types:
           implementation:
             file: "embedded"
             type: tosca.artifacts.Deployment.Image.Container.Docker
-  org.heappe.nodes.Dataset:
-    derived_from: org.heappe.nodes.pub.Dataset
+  org.lexis.common.heappe.nodes.Dataset:
+    derived_from: org.lexis.common.heappe.nodes.pub.Dataset
     description: >
       Transfer a dataset to a HEAppEJob input files directory
 
-  org.heappe.nodes.pub.Results:
+  org.lexis.common.heappe.nodes.pub.Results:
     derived_from: tosca.nodes.Root
     abstract: true
     description: >
@@ -404,12 +445,12 @@ node_types:
           Name of Zip file containing results files retrieved from the job
     capabilities:
       job_results:
-        type: org.heappe.capabilities.HeappeJobResults
+        type: org.lexis.common.heappe.capabilities.HeappeJobResults
     requirements:
       - job:
-          capability: org.heappe.capabilities.HeappeJob
-          node: org.heappe.nodes.pub.Job
-          relationship: org.heappe.relationships.GetResultsFromJob
+          capability: org.lexis.common.heappe.capabilities.HeappeJob
+          node: org.lexis.common.heappe.nodes.pub.Job
+          relationship: org.lexis.common.heappe.relationships.GetResultsFromJob
           occurrences: [1, 1]
     interfaces:
       Standard:
@@ -418,11 +459,11 @@ node_types:
             JOB_ID: { get_attribute: [REQ_TARGET, job, job_id] }
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
         delete:
           implementation:
             file: "embedded"
-            type: org.heappe.artifacts.Deployment
+            type: org.lexis.common.heappe.artifacts.Deployment
       Custom:
         getResults:
           inputs:
@@ -430,23 +471,23 @@ node_types:
           implementation:
             file: "embedded"
             type: tosca.artifacts.Deployment.Image.Container.Docker
-  org.heappe.nodes.Results:
-    derived_from: org.heappe.nodes.pub.Results
+  org.lexis.common.heappe.nodes.Results:
+    derived_from: org.lexis.common.heappe.nodes.pub.Results
     description: >
       Get result files from a HEAppEJob
 
 capability_types:
-  org.heappe.capabilities.HeappeJob:
+  org.lexis.common.heappe.capabilities.HeappeJob:
     derived_from: tosca.capabilities.Root
     description: >
       A capability fulfilling requirements of a node requiring to be
       associated with a HEAppE Job.
-  org.heappe.capabilities.HeappeJobResults:
+  org.lexis.common.heappe.capabilities.HeappeJobResults:
     derived_from: tosca.capabilities.Root
     description: >
       A capability fulfilling requirements of a node requiring to be
       associated with HEAppE Job Results.
-  org.heappe.capabilities.FileContent:
+  org.lexis.common.heappe.capabilities.FileContent:
     derived_from: tosca.capabilities.Root
     description: >
       A capability providing the content of a file produced by a job.
@@ -454,7 +495,7 @@ capability_types:
       filecontent:
         type: string
         description: File content
-  org.heappe.capabilities.TasksParametersProvider:
+  org.lexis.common.heappe.capabilities.TasksParametersProvider:
     derived_from: tosca.capabilities.Root
     description: >
       A capability providing tasks parameters to a job.
@@ -465,18 +506,18 @@ capability_types:
           Base64-encoded string of a json map of tasks parameters.
           Example: {"FirstTask": [{"CommandParameterIdentifier": "param1", "ParameterValue": "value1"}]}
 relationship_types:
-  org.heappe.relationships.DependsOnJob:
+  org.lexis.common.heappe.relationships.DependsOnJob:
     derived_from: tosca.relationships.DependsOn
     description: Relationship between a component and a HEAppE job
-    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
-  org.heappe.relationships.SendInputsToJob:
+    valid_target_types: [ org.lexis.common.heappe.capabilities.HeappeJob ]
+  org.lexis.common.heappe.relationships.SendInputsToJob:
     derived_from: tosca.relationships.DependsOn
-  org.heappe.relationships.GetResultsFromJob:
+  org.lexis.common.heappe.relationships.GetResultsFromJob:
     derived_from: tosca.relationships.DependsOn
-  org.heappe.relationships.FileContent:
+  org.lexis.common.heappe.relationships.FileContent:
     derived_from: tosca.relationships.DependsOn
-    valid_target_types: [ org.heappe.capabilities.HeappeJob ]
-  org.heappe.relationships.TasksParametersProvider:
+    valid_target_types: [ org.lexis.common.heappe.capabilities.HeappeJob ]
+  org.lexis.common.heappe.relationships.TasksParametersProvider:
     derived_from: tosca.relationships.DependsOn
-    valid_target_types: [ org.heappe.capabilities.TasksParametersProvider ]
+    valid_target_types: [ org.lexis.common.heappe.capabilities.TasksParametersProvider ]
  
