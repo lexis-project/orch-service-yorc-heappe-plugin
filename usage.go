@@ -17,8 +17,8 @@ package main
 import (
 	"context"
 
-	"github.com/lexis-project/yorc-heappe-plugin/v1/collectors"
-	"github.com/lexis-project/yorc-heappe-plugin/v1/collectors/heappecollector"
+	"github.com/lexis-project/yorc-heappe-plugin/collectors"
+	"github.com/lexis-project/yorc-heappe-plugin/collectors/heappecollector"
 	"github.com/pkg/errors"
 
 	"github.com/ystia/yorc/v4/config"

@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/lexis-project/yorc-heappe-plugin/v1/collectors"
-	"github.com/lexis-project/yorc-heappe-plugin/v1/heappe"
+	"github.com/lexis-project/yorc-heappe-plugin/collectors"
+	"github.com/lexis-project/yorc-heappe-plugin/heappe"
 	"github.com/pkg/errors"
 
 	"github.com/ystia/yorc/v4/config"

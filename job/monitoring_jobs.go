@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lexis-project/yorc-heappe-plugin/v1/heappe"
+	"github.com/lexis-project/yorc-heappe-plugin/heappe"
 	"github.com/pkg/errors"
 
 	"github.com/ystia/yorc/v4/config"

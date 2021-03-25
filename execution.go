@@ -20,7 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/lexis-project/yorc-heappe-plugin/v1/job"
+	"github.com/lexis-project/yorc-heappe-plugin/job"
 
 	"github.com/ystia/yorc/v4/config"
 	"github.com/ystia/yorc/v4/deployments"
