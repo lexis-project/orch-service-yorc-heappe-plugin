@@ -13,7 +13,7 @@ data_types:
   org.lexis.common.heappe.types.CommandTemplateParameterValue:
     derived_from: tosca.datatypes.Root
     properties:
-      CommandParameterIdentifier :
+      CommandParameterIdentifier:
         description: Command parameter identifier
         type: string
         required: true
@@ -160,11 +160,11 @@ data_types:
         description: Accounting project
         type: string
         required: true
-      ClusterId :
+      ClusterId:
         description: Cluster ID
         type: integer
         required: true
-      Tasks :
+      Tasks:
         description: Tasks (at leat one task needs to be defined)
         type: list
         entry_schema:
