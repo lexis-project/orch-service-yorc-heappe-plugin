@@ -115,7 +115,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if ok {
 		listChangedFilesWhileRunning, _ = strconv.ParseBool(boolStr)
 	}
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["token"])
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
 	if err != nil {
 		return true, err
 	}
@@ -313,7 +313,7 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 		return true, errors.Errorf("Missing mandatory information filePath for actionType:%q", action.ActionType)
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["token"])
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
 	if err != nil {
 		return true, err
 	}

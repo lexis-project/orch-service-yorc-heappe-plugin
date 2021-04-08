@@ -76,8 +76,14 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		monitoringTimeInterval = locationDefaultMonitoringTimeInterval
 	}
 
-	token, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
-		nodeName, "token")
+	accessToken, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
+		nodeName, "accessToken")
+	if err != nil {
+		return exec, err
+	}
+
+	refreshToken, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
+		nodeName, "refreshToken")
 	if err != nil {
 		return exec, err
 	}
@@ -96,7 +102,8 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			DeploymentID:           deploymentID,
 			TaskID:                 taskID,
 			NodeName:               nodeName,
-			Token:                  token,
+			AccessToken:            accessToken,
+			RefreshToken:           refreshToken,
 			ListFilesWhileRunning:  listFiles,
 			Operation:              operation,
 			MonitoringTimeInterval: monitoringTimeInterval,
@@ -138,7 +145,8 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		DeploymentID:           deploymentID,
 		TaskID:                 taskID,
 		NodeName:               nodeName,
-		Token:                  token,
+		AccessToken:            accessToken,
+		RefreshToken:           refreshToken,
 		Operation:              operation,
 		MonitoringTimeInterval: monitoringTimeInterval,
 	}

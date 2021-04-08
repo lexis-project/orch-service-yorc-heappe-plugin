@@ -2,7 +2,7 @@ tosca_definitions_version: alien_dsl_2_0_0
 
 metadata:
   template_name: org.lexis.common.heappe-types
-  template_version: 1.0.3
+  template_version: 1.0.6
   template_author: yorc
 
 imports:
@@ -250,8 +250,12 @@ node_types:
         description: Specification of the job to create
         type: org.lexis.common.heappe.types.JobSpecification
         required: true
-      token:
-        description: Access token
+      accessToken:
+        description: OpenID Connect Access token
+        type: string
+        required: false
+      refreshToken:
+        description: OpenID Connect Refresh token
         type: string
         required: false
       listChangedFilesWhileRunning:
@@ -332,11 +336,6 @@ node_types:
     derived_from: org.lexis.common.heappe.nodes.pub.Job
     description: >
       HEAppE Job where tasks parameters are provided by another component
-    properties:
-      token:
-        description: Access token
-        type: string
-        required: false
     requirements:
       - tasks_parameters_provider:
           capability: org.lexis.common.heappe.capabilities.TasksParametersProvider
@@ -357,8 +356,12 @@ node_types:
     description: >
       Wait for the creation of a file by a given job and get its content(abstract)
     properties:
-      token:
-        description: Access token
+      accessToken:
+        description: OpenID Connect Access token
+        type: string
+        required: false
+      refreshToken:
+        description: OpenID Connect Refresh token
         type: string
         required: false
       file_path:
@@ -416,8 +419,12 @@ node_types:
     description: >
       Transfer a zipped dataset to a HEAppEJob input files directory (abstract)
     properties:
-      token:
-        description: Access token
+      accessToken:
+        description: OpenID Connect Access token
+        type: string
+        required: false
+      refreshToken:
+        description: OpenID Connect Refresh token
         type: string
         required: false
     artifacts:
@@ -461,8 +468,12 @@ node_types:
     description: >
       Get result files from a HEAppEJob (abstract) 
     properties:
-      token:
-        description: Access token
+      accessToken:
+        description: OpenID Connect Access token
+        type: string
+        required: false
+      refreshToken:
+        description: OpenID Connect Refresh token
         type: string
         required: false
     attributes:

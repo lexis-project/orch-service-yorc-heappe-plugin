@@ -18,6 +18,7 @@ export CGO_ENABLED=0
 
 build: format
 	@echo "--> Running go build"
+	@mkdir -p ./bin
 	@go build -o bin/heappe-plugin
 	@echo "--> Embedding HEAppE types in binary"
 	@rm -Rf ./build

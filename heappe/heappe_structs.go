@@ -42,10 +42,11 @@ type Authentication struct {
 	Credentials PasswordCredentials
 }
 
-// OpenIDCredentials holds an OPenID token and user name to perform a token-based authentication
+// OpenIDCredentials holds OpenID access and refresh tokens and user name to perform a token-based authentication
 type OpenIDCredentials struct {
-	OpenIdAccessToken string
-	Username          string
+	OpenIdAccessToken  string
+	OpenIdRefreshToken string
+	Username           string
 }
 
 // Authentication parameters
