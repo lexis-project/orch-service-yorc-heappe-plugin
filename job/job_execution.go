@@ -66,7 +66,8 @@ type Execution struct {
 	DeploymentID           string
 	TaskID                 string
 	NodeName               string
-	Token                  string
+	AccessToken            string
+	RefreshToken           string
 	ListFilesWhileRunning  bool
 	Operation              prov.Operation
 	MonitoringTimeInterval time.Duration
@@ -89,7 +90,8 @@ func (e *Execution) ExecuteAsync(ctx context.Context) (*prov.Action, time.Durati
 	data["taskID"] = e.TaskID
 	data["nodeName"] = e.NodeName
 	data["jobID"] = strconv.FormatInt(jobID, 10)
-	data["token"] = e.Token
+	data["accessToken"] = e.AccessToken
+	data["refreshToken"] = e.RefreshToken
 	data[listChangedFilesAction] = strconv.FormatBool(e.ListFilesWhileRunning)
 
 	return &prov.Action{ActionType: "heappe-job-monitoring", Data: data}, e.MonitoringTimeInterval, err
@@ -210,7 +212,7 @@ func (e *Execution) createJob(ctx context.Context) error {
 	events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
 		"Creating job %+v ", jobSpec)
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -294,7 +296,7 @@ func (e *Execution) deleteJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -309,7 +311,7 @@ func (e *Execution) submitJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -324,7 +326,7 @@ func (e *Execution) enableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -344,7 +346,7 @@ func (e *Execution) disableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -390,7 +392,7 @@ func (e *Execution) listChangedFiles(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -451,7 +453,7 @@ func (e *Execution) cancelJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -847,7 +849,7 @@ func getBoolNodePropertyValue(ctx context.Context, deploymentID, nodeName, prope
 	return result, err
 }
 
-func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, token string) (heappe.Client, error) {
+func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, accessToken, refreshToken string) (heappe.Client, error) {
 	locationMgr, err := locations.GetManager(cfg)
 	if err != nil {
 		return nil, err
@@ -859,5 +861,5 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 		return nil, err
 	}
 
-	return heappe.GetClient(locationProps, token)
+	return heappe.GetClient(locationProps, accessToken, refreshToken)
 }

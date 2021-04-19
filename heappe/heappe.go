@@ -68,15 +68,15 @@ type Client interface {
 }
 
 // GetClient returns a HEAppE client for a given location
-func GetClient(locationProps config.DynamicMap, token string) (Client, error) {
+func GetClient(locationProps config.DynamicMap, accessToken, refreshToken string) (Client, error) {
 
 	url := locationProps.GetString(locationURLPropertyName)
 	if url == "" {
 		return nil, errors.Errorf("No URL defined in HEAppE location configuration")
 	}
 
-	if token != "" {
-		return getOpenIDAuthClient(url, token), nil
+	if accessToken != "" {
+		return getOpenIDAuthClient(url, accessToken, refreshToken), nil
 	}
 
 	username := locationProps.GetString(LocationUserPropertyName)
@@ -89,12 +89,13 @@ func GetClient(locationProps config.DynamicMap, token string) (Client, error) {
 }
 
 // getOpenIDAuthClient returns a client performing an OpenID connect token-based authentication
-func getOpenIDAuthClient(url, token string) Client {
+func getOpenIDAuthClient(url, accessToken, refreshToken string) Client {
 	return &heappeClient{
 		openIDAuth: OpenIDAuthentication{
 			Credentials: OpenIDCredentials{
-				Username:          "YorcUser",
-				OpenIdAccessToken: token,
+				Username:           "YorcUser",
+				OpenIdAccessToken:  accessToken,
+				OpenIdRefreshToken: refreshToken,
 			},
 		},
 		httpClient: getHTTPClient(url),

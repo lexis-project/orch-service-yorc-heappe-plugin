@@ -55,7 +55,8 @@ type DatasetTransferExecution struct {
 	DeploymentID           string
 	TaskID                 string
 	NodeName               string
-	Token                  string
+	AccessToken            string
+	RefreshToken           string
 	Operation              prov.Operation
 	OverlayPath            string
 	Artifacts              map[string]string
@@ -90,7 +91,8 @@ func (e *DatasetTransferExecution) ExecuteAsync(ctx context.Context) (*prov.Acti
 	data["taskID"] = e.TaskID
 	data["nodeName"] = e.NodeName
 	data["jobID"] = jobIDStr
-	data["token"] = e.Token
+	data["accessToken"] = e.AccessToken
+	data["refreshToken"] = e.RefreshToken
 
 	return &prov.Action{ActionType: "heappe-filecontent-monitoring", Data: data}, e.MonitoringTimeInterval, err
 
@@ -155,7 +157,7 @@ func (e *DatasetTransferExecution) ResolveExecution(ctx context.Context) error {
 
 func (e *DatasetTransferExecution) transferDataset(ctx context.Context) error {
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -250,7 +252,7 @@ func (e *DatasetTransferExecution) getDatasetFileNames(jobID int64) ([]string, e
 func (e *DatasetTransferExecution) getResultFiles(ctx context.Context) error {
 
 	// Get details on remote host where to get result files
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.Token)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
 	if err != nil {
 		return err
 	}
