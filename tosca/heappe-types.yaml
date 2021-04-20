@@ -248,6 +248,10 @@ node_types:
         type: string
         description: >
           ID of the HEAppE job created
+      heappe_url:
+        type: string
+        description: >
+          URL of the HEAppE instance on which the job is created
       file_transfer:
         type: org.lexis.common.heappe.types.FileTransfer
         description: >

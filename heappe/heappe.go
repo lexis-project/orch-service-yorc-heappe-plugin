@@ -56,6 +56,7 @@ type Client interface {
 	GetJobInfo(jobID int64) (JobInfo, error)
 	SetSessionID(sessionID string)
 	GetSessionID() string
+	GetURL() string
 	DownloadPartsOfJobFilesFromCluster(JobID int64, offsets []TaskFileOffset) ([]JobFileContent, error)
 	GetFileTransferMethod(jobID int64) (FileTransferMethod, error)
 	EndFileTransfer(jobID int64, ft FileTransferMethod) error
@@ -130,6 +131,11 @@ func (h *heappeClient) SetSessionID(sessionID string) {
 // GetSessionID sets a HEAppE session ID
 func (h *heappeClient) GetSessionID() string {
 	return h.sessionID
+}
+
+// GetURL returns the URL of the HEAppE instance
+func (h *heappeClient) GetURL() string {
+	return h.httpClient.baseURL
 }
 
 // CreateJob creates a HEAppE job

@@ -47,6 +47,7 @@ const (
 	jobSpecificationProperty      = "JobSpecification"
 	infrastructureType            = "heappe"
 	jobIDConsulAttribute          = "job_id"
+	heappeURLConsulAttribute      = "heappe_url"
 	transferUser                  = "user"
 	transferKey                   = "key"
 	transferServer                = "server"
@@ -227,6 +228,14 @@ func (e *Execution) createJob(ctx context.Context) error {
 		jobIDConsulAttribute, strconv.FormatInt(jobInfo.ID, 10))
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store this job id", jobInfo.ID)
+		return err
+	}
+
+	// Store the URL of the HEAppE instance where this job is created
+	err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		heappeURLConsulAttribute, heappeClient.GetURL())
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d created on HEAppE, but failed to store the HEAppE instancel URL %s", jobInfo.ID, heappeClient.GetURL())
 		return err
 	}
 
@@ -860,6 +869,5 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 	if err != nil {
 		return nil, err
 	}
-
 	return heappe.GetClient(locationProps, accessToken, refreshToken)
 }
