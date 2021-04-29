@@ -115,7 +115,8 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if ok {
 		listChangedFilesWhileRunning, _ = strconv.ParseBool(boolStr)
 	}
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
+	log.Printf("LOLO listChangedFilesWhileRunning: %+v\n", listChangedFilesWhileRunning)
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["user"])
 	if err != nil {
 		return true, err
 	}
@@ -162,6 +163,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	case jobStateRunning:
 		// job is still running : monitoring is keeping on (deregister stays false)
 		if listChangedFilesWhileRunning {
+			log.Printf("LOLO update list of changed files\n")
 			updateErr := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
 			if err != nil {
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
@@ -313,7 +315,7 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 		return true, errors.Errorf("Missing mandatory information filePath for actionType:%q", action.ActionType)
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["user"])
 	if err != nil {
 		return true, err
 	}

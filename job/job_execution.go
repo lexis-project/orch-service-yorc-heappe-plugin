@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/lexis-project/yorc-heappe-plugin/aai"
 	"github.com/lexis-project/yorc-heappe-plugin/heappe"
 	"github.com/pkg/errors"
 
@@ -38,6 +39,14 @@ import (
 )
 
 const (
+	// AccessTokenConsulAttribute is the access token attribute of a job stored in consul
+	AccessTokenConsulAttribute = "access_token"
+	// RefreshTokenConsulAttribute is the refresh token attribute of a job stored in consul
+	RefreshTokenConsulAttribute   = "refresh_token"
+	locationAAIURL                = "aai_url"
+	locationAAIClientID           = "aai_client_id"
+	locationAAIClientSecret       = "aai_client_secret"
+	locationAAIRealm              = "aai_realm"
 	installOperation              = "install"
 	uninstallOperation            = "uninstall"
 	enableFileTransferOperation   = "custom.enable_file_transfer"
@@ -67,8 +76,7 @@ type Execution struct {
 	DeploymentID           string
 	TaskID                 string
 	NodeName               string
-	AccessToken            string
-	RefreshToken           string
+	User                   string
 	ListFilesWhileRunning  bool
 	Operation              prov.Operation
 	MonitoringTimeInterval time.Duration
@@ -91,8 +99,7 @@ func (e *Execution) ExecuteAsync(ctx context.Context) (*prov.Action, time.Durati
 	data["taskID"] = e.TaskID
 	data["nodeName"] = e.NodeName
 	data["jobID"] = strconv.FormatInt(jobID, 10)
-	data["accessToken"] = e.AccessToken
-	data["refreshToken"] = e.RefreshToken
+	data["user"] = e.User
 	data[listChangedFilesAction] = strconv.FormatBool(e.ListFilesWhileRunning)
 
 	return &prov.Action{ActionType: "heappe-job-monitoring", Data: data}, e.MonitoringTimeInterval, err
@@ -213,7 +220,7 @@ func (e *Execution) createJob(ctx context.Context) error {
 	events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
 		"Creating job %+v ", jobSpec)
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -305,7 +312,7 @@ func (e *Execution) deleteJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -320,7 +327,7 @@ func (e *Execution) submitJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -335,7 +342,7 @@ func (e *Execution) enableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -355,7 +362,7 @@ func (e *Execution) disableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -401,7 +408,7 @@ func (e *Execution) listChangedFiles(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -415,6 +422,8 @@ func updateListOfChangedFiles(ctx context.Context, heappeClient heappe.Client, d
 	if err != nil {
 		return err
 	}
+
+	log.Printf("LOLO changed files: %+v\n", changedFiles)
 
 	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, nodeName,
 		changedFilesConsulAttribute, changedFiles)
@@ -462,7 +471,7 @@ func (e *Execution) cancelJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -858,7 +867,7 @@ func getBoolNodePropertyValue(ctx context.Context, deploymentID, nodeName, prope
 	return result, err
 }
 
-func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, accessToken, refreshToken string) (heappe.Client, error) {
+func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, user string) (heappe.Client, error) {
 	locationMgr, err := locations.GetManager(cfg)
 	if err != nil {
 		return nil, err
@@ -869,5 +878,65 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 	if err != nil {
 		return nil, err
 	}
-	return heappe.GetClient(locationProps, accessToken, refreshToken)
+
+	var accessToken string
+	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, "0", AccessTokenConsulAttribute)
+	if err != nil {
+		return nil, err
+	}
+	if val != nil {
+		accessToken = val.RawString()
+	}
+
+	var refreshTokenFunc heappe.RefreshTokenFunc = func() (string, error) {
+		accessToken, _, err := RefreshToken(ctx, locationProps, deploymentID, nodeName)
+		return accessToken, err
+	}
+
+	// TODO: LOLO change this when the offline token code will work
+	return heappe.GetClient(locationProps, user, accessToken, refreshTokenFunc)
+	// return heappe.GetClient(locationProps, "YorcUser", "", nil)
+}
+
+// GetAAIClient returns the AAI client for a given location
+func GetAAIClient(locationProps config.DynamicMap) aai.Client {
+	url := locationProps.GetString(locationAAIURL)
+	clientID := locationProps.GetString(locationAAIClientID)
+	clientSecret := locationProps.GetString(locationAAIClientSecret)
+	realm := locationProps.GetString(locationAAIRealm)
+	return aai.GetClient(url, clientID, clientSecret, realm)
+}
+
+// RefreshToken refreshes an access token
+func RefreshToken(ctx context.Context, locationProps config.DynamicMap, deploymentID, nodeName string) (string, string, error) {
+
+	var refreshToken string
+	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, "0", RefreshTokenConsulAttribute)
+	if err != nil {
+		return "", "", err
+	}
+	if val != nil {
+		refreshToken = val.RawString()
+	}
+
+	aaiClient := GetAAIClient(locationProps)
+	// Getting an AAI client to check token validity
+	accessToken, newRefreshToken, err := aaiClient.RefreshToken(ctx, refreshToken)
+	if err != nil {
+		return accessToken, newRefreshToken, errors.Wrapf(err, "Failed to refresh token for orchestrator")
+	}
+	// Store these values
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
+		AccessTokenConsulAttribute, accessToken)
+	if err != nil {
+		return accessToken, newRefreshToken, errors.Wrapf(err, "Job %s, failed to store access token", nodeName)
+	}
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
+		RefreshTokenConsulAttribute, newRefreshToken)
+	if err != nil {
+		return accessToken, newRefreshToken, errors.Wrapf(err, "Job %s, failed to store refresh token", nodeName)
+	}
+
+	return accessToken, newRefreshToken, err
+
 }
