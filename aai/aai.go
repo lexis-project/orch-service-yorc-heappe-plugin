@@ -24,22 +24,22 @@ import (
 )
 
 type UserInfo struct {
-	Sub               string              `json:"sub,omitempty"`
-	Name              string              `json:"name,omitempty"`
-	GivenName         string              `json:"given_name,omitempty"`
-	FamilyName        string              `json:"family_name,omitempty"`
-	MiddleName        string              `json:"middle_name,omitempty"`
-	Nickname          string              `json:"nickname,omitempty"`
-	PreferredUsername string              `json:"preferred_username,omitempty"`
-	Profile           string              `json:"profile,omitempty"`
-	Picture           string              `json:"picture,omitempty"`
-	Website           string              `json:"website,omitempty"`
-	Email             string              `json:"email,omitempty"`
-	Gender            string              `json:"gender,omitempty"`
-	ZoneInfo          string              `json:"zoneinfo,omitempty"`
-	Locale            string              `json:"locale,omitempty"`
-	PhoneNumber       string              `json:"phone_number,omitempty"`
-	Attributes        map[string][]string `json:"attributes,omitempty"`
+	Sub               string                         `json:"sub,omitempty"`
+	Name              string                         `json:"name,omitempty"`
+	GivenName         string                         `json:"given_name,omitempty"`
+	FamilyName        string                         `json:"family_name,omitempty"`
+	MiddleName        string                         `json:"middle_name,omitempty"`
+	Nickname          string                         `json:"nickname,omitempty"`
+	PreferredUsername string                         `json:"preferred_username,omitempty"`
+	Profile           string                         `json:"profile,omitempty"`
+	Picture           string                         `json:"picture,omitempty"`
+	Website           string                         `json:"website,omitempty"`
+	Email             string                         `json:"email,omitempty"`
+	Gender            string                         `json:"gender,omitempty"`
+	ZoneInfo          string                         `json:"zoneinfo,omitempty"`
+	Locale            string                         `json:"locale,omitempty"`
+	PhoneNumber       string                         `json:"phone_number,omitempty"`
+	Attributes        map[string][]map[string]string `json:"attributes,omitempty"`
 }
 
 func (u UserInfo) GetName() string {
