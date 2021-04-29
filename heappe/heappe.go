@@ -49,7 +49,7 @@ const (
 	invalidTokenError            = "Invalid OpenId token"
 )
 
-// Type of function provided by the called to refresh a token when needed
+// RefreshTokenFunc is a type of function provided by the called to refresh a token when needed
 type RefreshTokenFunc func() (newAccessToken string, err error)
 
 // Client is the client interface to HEAppE service
