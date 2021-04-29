@@ -423,8 +423,6 @@ func updateListOfChangedFiles(ctx context.Context, heappeClient heappe.Client, d
 		return err
 	}
 
-	log.Printf("LOLO changed files: %+v\n", changedFiles)
-
 	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, nodeName,
 		changedFilesConsulAttribute, changedFiles)
 	if err != nil {
@@ -893,9 +891,7 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 		return accessToken, err
 	}
 
-	// TODO: LOLO change this when the offline token code will work
 	return heappe.GetClient(locationProps, user, accessToken, refreshTokenFunc)
-	// return heappe.GetClient(locationProps, "YorcUser", "", nil)
 }
 
 // GetAAIClient returns the AAI client for a given location
