@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/lexis-project/yorc-heappe-plugin/aai"
+	"github.com/laurentganne/yorcoidc"
 	"github.com/lexis-project/yorc-heappe-plugin/heappe"
 	"github.com/pkg/errors"
 
@@ -899,12 +899,12 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 }
 
 // GetAAIClient returns the AAI client for a given location
-func GetAAIClient(locationProps config.DynamicMap) aai.Client {
+func GetAAIClient(locationProps config.DynamicMap) yorcoidc.Client {
 	url := locationProps.GetString(locationAAIURL)
 	clientID := locationProps.GetString(locationAAIClientID)
 	clientSecret := locationProps.GetString(locationAAIClientSecret)
 	realm := locationProps.GetString(locationAAIRealm)
-	return aai.GetClient(url, clientID, clientSecret, realm)
+	return yorcoidc.GetClient(url, clientID, clientSecret, realm)
 }
 
 // RefreshToken refreshes an access token
