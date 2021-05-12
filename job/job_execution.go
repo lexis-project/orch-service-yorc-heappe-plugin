@@ -885,7 +885,6 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 	if val != nil {
 		accessToken = val.RawString()
 	}
-
 	var refreshTokenFunc heappe.RefreshTokenFunc = func() (string, error) {
 		accessToken, _, err := RefreshToken(ctx, locationProps, deploymentID, nodeName)
 		return accessToken, err

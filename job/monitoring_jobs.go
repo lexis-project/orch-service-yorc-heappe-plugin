@@ -140,7 +140,9 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 
 	if actionData.sessionID == "" {
 		// Storing the session ID for next job state check
-		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, heappeClient.GetSessionID())
+		sessionID := heappeClient.GetSessionID()
+		log.Debugf("New HEAppE session ID %s\n", sessionID)
+		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, sessionID)
 		if err != nil {
 			return true, errors.Wrapf(err, "failed to update action data for deployment %s node %s", deploymentID, actionData.nodeName)
 		}

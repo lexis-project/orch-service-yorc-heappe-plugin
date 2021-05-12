@@ -44,8 +44,8 @@ type Authentication struct {
 
 // OpenIDCredentials holds OpenID Connect token and user name to perform a token-based authentication
 type OpenIDCredentials struct {
-	OpenIdtoken string
-	Username    string
+	OpenIdAccessToken string
+	Username          string
 }
 
 // Authentication parameters

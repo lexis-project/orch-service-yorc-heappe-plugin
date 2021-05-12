@@ -85,12 +85,9 @@ func GetClient(locationProps config.DynamicMap, username, token string, refreshT
 		return getOpenIDAuthClient(url, username, token, refreshToken), nil
 	}
 
-	user := username
+	user := locationProps.GetString(LocationUserPropertyName)
 	if user == "" {
-		user = locationProps.GetString(LocationUserPropertyName)
-	}
-	if user == "" {
-		return nil, errors.Errorf("No user defined in location")
+		return nil, errors.Errorf("No token provided, and no user defined in location either")
 	}
 	password := locationProps.GetString(locationPasswordPropertyName)
 
@@ -102,8 +99,8 @@ func getOpenIDAuthClient(url, username, token string, refreshToken RefreshTokenF
 	return &heappeClient{
 		openIDAuth: OpenIDAuthentication{
 			Credentials: OpenIDCredentials{
-				Username:    username,
-				OpenIdtoken: token,
+				Username:          username,
+				OpenIdAccessToken: token,
 			},
 		},
 		refreshToken: refreshToken,
@@ -509,7 +506,7 @@ func (h *heappeClient) authenticate() (string, error) {
 	var sessionID string
 	var err error
 
-	if h.openIDAuth.Credentials.OpenIdtoken != "" {
+	if h.openIDAuth.Credentials.OpenIdAccessToken != "" {
 		return h.authenticateWithToken()
 	}
 
@@ -536,7 +533,7 @@ func (h *heappeClient) authenticateWithToken() (string, error) {
 		err = h.httpClient.doRequest(http.MethodPost, heappeAuthOpenIDREST, http.StatusOK, h.openIDAuth, &sessionID)
 		if err != nil {
 			if strings.Contains(err.Error(), invalidTokenError) && !tokenRefreshed {
-				h.openIDAuth.Credentials.OpenIdtoken, err = h.refreshToken()
+				h.openIDAuth.Credentials.OpenIdAccessToken, err = h.refreshToken()
 				tokenRefreshed = true
 				done = (err != nil)
 			}

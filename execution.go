@@ -126,6 +126,9 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			return exec, errors.Wrapf(err, "Failed to exchange token for orchestrator")
 		}
 
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
+			fmt.Sprintf("Token exchanged for an orchestrator client access/refresh token for node %s", nodeName))
+
 		// Store these values
 		err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
 			job.AccessTokenConsulAttribute, accessToken)
