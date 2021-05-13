@@ -39,10 +39,6 @@ import (
 )
 
 const (
-	// AccessTokenConsulAttribute is the access token attribute of a job stored in consul
-	AccessTokenConsulAttribute = "access_token"
-	// RefreshTokenConsulAttribute is the refresh token attribute of a job stored in consul
-	RefreshTokenConsulAttribute   = "refresh_token"
 	locationAAIURL                = "aai_url"
 	locationAAIClientID           = "aai_client_id"
 	locationAAIClientSecret       = "aai_client_secret"
@@ -877,16 +873,13 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 		return nil, err
 	}
 
-	var accessToken string
-	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, "0", AccessTokenConsulAttribute)
+	aaiClient := GetAAIClient(deploymentID, locationProps)
+	accessToken, err := aaiClient.GetAccessToken()
 	if err != nil {
 		return nil, err
 	}
-	if val != nil {
-		accessToken = val.RawString()
-	}
 	var refreshTokenFunc heappe.RefreshTokenFunc = func() (string, error) {
-		accessToken, _, err := RefreshToken(ctx, locationProps, deploymentID, nodeName)
+		accessToken, _, err := aaiClient.RefreshToken(ctx)
 		return accessToken, err
 	}
 
@@ -894,44 +887,20 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 }
 
 // GetAAIClient returns the AAI client for a given location
-func GetAAIClient(locationProps config.DynamicMap) yorcoidc.Client {
+func GetAAIClient(deploymentID string, locationProps config.DynamicMap) yorcoidc.Client {
 	url := locationProps.GetString(locationAAIURL)
 	clientID := locationProps.GetString(locationAAIClientID)
 	clientSecret := locationProps.GetString(locationAAIClientSecret)
 	realm := locationProps.GetString(locationAAIRealm)
-	return yorcoidc.GetClient(url, clientID, clientSecret, realm)
+	return yorcoidc.GetClient(deploymentID, url, clientID, clientSecret, realm)
 }
 
 // RefreshToken refreshes an access token
 func RefreshToken(ctx context.Context, locationProps config.DynamicMap, deploymentID, nodeName string) (string, string, error) {
 
-	var refreshToken string
-	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, "0", RefreshTokenConsulAttribute)
-	if err != nil {
-		return "", "", err
-	}
-	if val != nil {
-		refreshToken = val.RawString()
-	}
-
-	aaiClient := GetAAIClient(locationProps)
+	aaiClient := GetAAIClient(deploymentID, locationProps)
 	// Getting an AAI client to check token validity
-	accessToken, newRefreshToken, err := aaiClient.RefreshToken(ctx, refreshToken)
-	if err != nil {
-		return accessToken, newRefreshToken, errors.Wrapf(err, "Failed to refresh token for orchestrator")
-	}
-	// Store these values
-	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-		AccessTokenConsulAttribute, accessToken)
-	if err != nil {
-		return accessToken, newRefreshToken, errors.Wrapf(err, "Job %s, failed to store access token", nodeName)
-	}
-	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-		RefreshTokenConsulAttribute, newRefreshToken)
-	if err != nil {
-		return accessToken, newRefreshToken, errors.Wrapf(err, "Job %s, failed to store refresh token", nodeName)
-	}
-
+	accessToken, newRefreshToken, err := aaiClient.RefreshToken(ctx)
 	return accessToken, newRefreshToken, err
 
 }

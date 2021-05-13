@@ -88,15 +88,11 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	}
 
 	// Getting an AAI client to check token validity
-	aaiClient := job.GetAAIClient(locationProps)
+	aaiClient := job.GetAAIClient(deploymentID, locationProps)
 
-	var accessToken, refreshToken string
-	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, ids[0], job.AccessTokenConsulAttribute)
+	accessToken, err := aaiClient.GetAccessToken()
 	if err != nil {
 		return nil, err
-	}
-	if val != nil {
-		accessToken = val.RawString()
 	}
 
 	if accessToken == "" {
@@ -121,7 +117,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			return exec, errors.Errorf(errorMsg)
 		}
 		// Exchange this token for an access and a refresh token for the orchestrator
-		accessToken, refreshToken, err = aaiClient.ExchangeToken(ctx, token)
+		accessToken, _, err = aaiClient.ExchangeToken(ctx, token)
 		if err != nil {
 			return exec, errors.Wrapf(err, "Failed to exchange token for orchestrator")
 		}
@@ -129,26 +125,6 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
 			fmt.Sprintf("Token exchanged for an orchestrator client access/refresh token for node %s", nodeName))
 
-		// Store these values
-		err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-			job.AccessTokenConsulAttribute, accessToken)
-		if err != nil {
-			return exec, errors.Wrapf(err, "Job %s, failed to store access token", nodeName)
-		}
-		err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-			job.RefreshTokenConsulAttribute, refreshToken)
-		if err != nil {
-			return exec, errors.Wrapf(err, "Job %s, failed to store refresh token", nodeName)
-		}
-
-	} else {
-		val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, nodeName, ids[0], job.RefreshTokenConsulAttribute)
-		if err != nil {
-			return exec, err
-		}
-		if val != nil {
-			refreshToken = val.RawString()
-		}
 	}
 
 	// Checking the access token validity
@@ -158,20 +134,9 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	}
 
 	if !valid {
-		accessToken, refreshToken, err = aaiClient.RefreshToken(ctx, refreshToken)
+		accessToken, _, err = aaiClient.RefreshToken(ctx)
 		if err != nil {
 			return exec, errors.Wrapf(err, "Failed to refresh token for orchestrator")
-		}
-		// Store these values
-		err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-			job.AccessTokenConsulAttribute, accessToken)
-		if err != nil {
-			return exec, errors.Wrapf(err, "Job %s, failed to store access token", nodeName)
-		}
-		err = deployments.SetAttributeForAllInstances(ctx, deploymentID, nodeName,
-			job.RefreshTokenConsulAttribute, refreshToken)
-		if err != nil {
-			return exec, errors.Wrapf(err, "Job %s, failed to store refresh token", nodeName)
 		}
 	}
 

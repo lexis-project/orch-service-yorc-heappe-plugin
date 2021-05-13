@@ -267,12 +267,6 @@ node_types:
         description: Map of task name - task ID
         entry_schema:
           type: string
-      access_token:
-        type: string
-        description: OpenID Connect access token
-      refresh_token:
-        type: string
-        description: OpenID Connect refresh token
     capabilities:
       heappejob:
         type: org.lexis.common.heappe.capabilities.HeappeJob
