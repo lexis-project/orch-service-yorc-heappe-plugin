@@ -158,6 +158,10 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	switch jobState {
 	case jobStateCompleted:
 		// job has been done successfully : unregister monitoring
+		err = updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+		if err != nil {
+			log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
+		}
 		deregister = true
 	case jobStatePending:
 		// Not yet running: monitoring is keeping on (deregister stays false)
