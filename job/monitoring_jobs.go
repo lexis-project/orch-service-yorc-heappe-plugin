@@ -169,7 +169,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		// job is still running : monitoring is keeping on (deregister stays false)
 		if listChangedFilesWhileRunning {
 			updateErr := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
-			if err != nil {
+			if updateErr != nil {
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
 			}
 		}
