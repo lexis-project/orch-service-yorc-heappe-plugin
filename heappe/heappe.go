@@ -46,7 +46,7 @@ const (
 	// LocationUserPropertyName hold the name of user used to connect to HEAppE
 	LocationUserPropertyName     = "user"
 	locationPasswordPropertyName = "password"
-	invalidTokenError            = "Invalid OpenId token"
+	invalidTokenError            = "Invalid"
 )
 
 // RefreshTokenFunc is a type of function provided by the caller to refresh a token when needed

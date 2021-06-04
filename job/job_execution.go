@@ -879,6 +879,7 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 		return nil, err
 	}
 	var refreshTokenFunc heappe.RefreshTokenFunc = func() (string, error) {
+		log.Printf("HEAppE requests to refresh token for deployment %s\n", deploymentID)
 		accessToken, _, err := aaiClient.RefreshToken(ctx)
 		return accessToken, err
 	}
@@ -893,14 +894,4 @@ func GetAAIClient(deploymentID string, locationProps config.DynamicMap) yorcoidc
 	clientSecret := locationProps.GetString(locationAAIClientSecret)
 	realm := locationProps.GetString(locationAAIRealm)
 	return yorcoidc.GetClient(deploymentID, url, clientID, clientSecret, realm)
-}
-
-// RefreshToken refreshes an access token
-func RefreshToken(ctx context.Context, locationProps config.DynamicMap, deploymentID, nodeName string) (string, string, error) {
-
-	aaiClient := GetAAIClient(deploymentID, locationProps)
-	// Getting an AAI client to check token validity
-	accessToken, newRefreshToken, err := aaiClient.RefreshToken(ctx)
-	return accessToken, newRefreshToken, err
-
 }
