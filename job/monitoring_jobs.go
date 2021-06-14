@@ -130,10 +130,10 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if err != nil {
 		// Be resilient to temporary gateway errors here while a job is running
 		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
-			strings.Contains(err.Error(), "504 Gateway Time-out")
+			strings.Contains(err.Error(), "504 Gateway Time-out") || strings.Contains(err.Error(), "i/o timeout")
 
 		if nonFatalError {
-			log.Printf("Ignoring non fatal gateway error trying to get job info: %s", err.Error())
+			log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
 		}
 		return !nonFatalError, err
 	}
