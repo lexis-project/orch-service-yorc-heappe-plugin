@@ -17,6 +17,7 @@ package heappe
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -45,7 +46,11 @@ const (
 	// LocationUserPropertyName hold the name of user used to connect to HEAppE
 	LocationUserPropertyName     = "user"
 	locationPasswordPropertyName = "password"
+	invalidTokenError            = "Invalid"
 )
+
+// RefreshTokenFunc is a type of function provided by the caller to refresh a token when needed
+type RefreshTokenFunc func() (newAccessToken string, err error)
 
 // Client is the client interface to HEAppE service
 type Client interface {
@@ -69,37 +74,37 @@ type Client interface {
 }
 
 // GetClient returns a HEAppE client for a given location
-func GetClient(locationProps config.DynamicMap, accessToken, refreshToken string) (Client, error) {
+func GetClient(locationProps config.DynamicMap, username, token string, refreshToken RefreshTokenFunc) (Client, error) {
 
 	url := locationProps.GetString(locationURLPropertyName)
 	if url == "" {
 		return nil, errors.Errorf("No URL defined in HEAppE location configuration")
 	}
 
-	if accessToken != "" {
-		return getOpenIDAuthClient(url, accessToken, refreshToken), nil
+	if token != "" {
+		return getOpenIDAuthClient(url, username, token, refreshToken), nil
 	}
 
-	username := locationProps.GetString(LocationUserPropertyName)
-	if username == "" {
-		return nil, errors.Errorf("No user defined in location")
+	user := locationProps.GetString(LocationUserPropertyName)
+	if user == "" {
+		return nil, errors.Errorf("No token provided, and no user defined in location either")
 	}
 	password := locationProps.GetString(locationPasswordPropertyName)
 
-	return getBasicAuthClient(url, username, password), nil
+	return getBasicAuthClient(url, user, password), nil
 }
 
 // getOpenIDAuthClient returns a client performing an OpenID connect token-based authentication
-func getOpenIDAuthClient(url, accessToken, refreshToken string) Client {
+func getOpenIDAuthClient(url, username, token string, refreshToken RefreshTokenFunc) Client {
 	return &heappeClient{
 		openIDAuth: OpenIDAuthentication{
 			Credentials: OpenIDCredentials{
-				Username:           "YorcUser",
-				OpenIdAccessToken:  accessToken,
-				OpenIdRefreshToken: refreshToken,
+				Username:          username,
+				OpenIdAccessToken: token,
 			},
 		},
-		httpClient: getHTTPClient(url),
+		refreshToken: refreshToken,
+		httpClient:   getHTTPClient(url),
 	}
 }
 
@@ -117,10 +122,11 @@ func getBasicAuthClient(url, username, password string) Client {
 }
 
 type heappeClient struct {
-	auth       Authentication
-	openIDAuth OpenIDAuthentication
-	sessionID  string
-	httpClient *httpclient
+	auth         Authentication
+	openIDAuth   OpenIDAuthentication
+	refreshToken RefreshTokenFunc
+	sessionID    string
+	httpClient   *httpclient
 }
 
 // SetSessionID sets a HEAppE session ID
@@ -501,15 +507,37 @@ func (h *heappeClient) authenticate() (string, error) {
 	var err error
 
 	if h.openIDAuth.Credentials.OpenIdAccessToken != "" {
-		err = h.httpClient.doRequest(http.MethodPost, heappeAuthOpenIDREST, http.StatusOK, h.openIDAuth, &sessionID)
-	} else {
-		err = h.httpClient.doRequest(http.MethodPost, heappeAuthREST, http.StatusOK, h.auth, &sessionID)
+		return h.authenticateWithToken()
 	}
+
+	err = h.httpClient.doRequest(http.MethodPost, heappeAuthREST, http.StatusOK, h.auth, &sessionID)
 	if err != nil {
 		return sessionID, errors.Wrap(err, "Failed to authenticate to HEAppE")
 	}
 	if len(sessionID) == 0 {
 		err = errors.Errorf("Failed to open a HEAppE session")
+	}
+
+	return sessionID, err
+}
+
+func (h *heappeClient) authenticateWithToken() (string, error) {
+	var sessionID string
+	var err error
+
+	tokenRefreshed := false
+	done := false
+
+	for !done {
+		done = true
+		err = h.httpClient.doRequest(http.MethodPost, heappeAuthOpenIDREST, http.StatusOK, h.openIDAuth, &sessionID)
+		if err != nil {
+			if strings.Contains(err.Error(), invalidTokenError) && !tokenRefreshed {
+				h.openIDAuth.Credentials.OpenIdAccessToken, err = h.refreshToken()
+				tokenRefreshed = true
+				done = (err != nil)
+			}
+		}
 	}
 
 	return sessionID, err

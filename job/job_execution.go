@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/laurentganne/yorcoidc"
 	"github.com/lexis-project/yorc-heappe-plugin/heappe"
 	"github.com/pkg/errors"
 
@@ -38,6 +39,10 @@ import (
 )
 
 const (
+	locationAAIURL                = "aai_url"
+	locationAAIClientID           = "aai_client_id"
+	locationAAIClientSecret       = "aai_client_secret"
+	locationAAIRealm              = "aai_realm"
 	installOperation              = "install"
 	uninstallOperation            = "uninstall"
 	enableFileTransferOperation   = "custom.enable_file_transfer"
@@ -67,8 +72,7 @@ type Execution struct {
 	DeploymentID           string
 	TaskID                 string
 	NodeName               string
-	AccessToken            string
-	RefreshToken           string
+	User                   string
 	ListFilesWhileRunning  bool
 	Operation              prov.Operation
 	MonitoringTimeInterval time.Duration
@@ -91,8 +95,7 @@ func (e *Execution) ExecuteAsync(ctx context.Context) (*prov.Action, time.Durati
 	data["taskID"] = e.TaskID
 	data["nodeName"] = e.NodeName
 	data["jobID"] = strconv.FormatInt(jobID, 10)
-	data["accessToken"] = e.AccessToken
-	data["refreshToken"] = e.RefreshToken
+	data["user"] = e.User
 	data[listChangedFilesAction] = strconv.FormatBool(e.ListFilesWhileRunning)
 
 	return &prov.Action{ActionType: "heappe-job-monitoring", Data: data}, e.MonitoringTimeInterval, err
@@ -213,7 +216,7 @@ func (e *Execution) createJob(ctx context.Context) error {
 	events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
 		"Creating job %+v ", jobSpec)
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -305,7 +308,7 @@ func (e *Execution) deleteJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -320,7 +323,7 @@ func (e *Execution) submitJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -335,7 +338,7 @@ func (e *Execution) enableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -355,7 +358,7 @@ func (e *Execution) disableFileTransfer(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -401,7 +404,7 @@ func (e *Execution) listChangedFiles(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -420,10 +423,14 @@ func updateListOfChangedFiles(ctx context.Context, heappeClient heappe.Client, d
 		changedFilesConsulAttribute, changedFiles)
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d, failed to store list of changed files", jobID)
-		return err
-	}
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
+			"Failed to store list of changed files for %s job %d : %v", nodeName, jobID, err)
+		log.Printf("Failed to store list of changed files for deployment %s node %s job %d : %v", deploymentID, nodeName, jobID, err)
 
-	return err
+	}
+	// The consul failure to store the list of changed files should not result in a job failure
+	// so the error if any is just added in logs
+	return nil
 
 }
 
@@ -462,7 +469,7 @@ func (e *Execution) cancelJob(ctx context.Context) error {
 		return err
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.AccessToken, e.RefreshToken)
+	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
@@ -858,7 +865,7 @@ func getBoolNodePropertyValue(ctx context.Context, deploymentID, nodeName, prope
 	return result, err
 }
 
-func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, accessToken, refreshToken string) (heappe.Client, error) {
+func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID, nodeName, user string) (heappe.Client, error) {
 	locationMgr, err := locations.GetManager(cfg)
 	if err != nil {
 		return nil, err
@@ -869,5 +876,26 @@ func getHEAppEClient(ctx context.Context, cfg config.Configuration, deploymentID
 	if err != nil {
 		return nil, err
 	}
-	return heappe.GetClient(locationProps, accessToken, refreshToken)
+
+	aaiClient := GetAAIClient(deploymentID, locationProps)
+	accessToken, err := aaiClient.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	var refreshTokenFunc heappe.RefreshTokenFunc = func() (string, error) {
+		log.Printf("HEAppE requests to refresh token for deployment %s\n", deploymentID)
+		accessToken, _, err := aaiClient.RefreshToken(ctx)
+		return accessToken, err
+	}
+
+	return heappe.GetClient(locationProps, user, accessToken, refreshTokenFunc)
+}
+
+// GetAAIClient returns the AAI client for a given location
+func GetAAIClient(deploymentID string, locationProps config.DynamicMap) yorcoidc.Client {
+	url := locationProps.GetString(locationAAIURL)
+	clientID := locationProps.GetString(locationAAIClientID)
+	clientSecret := locationProps.GetString(locationAAIClientSecret)
+	realm := locationProps.GetString(locationAAIRealm)
+	return yorcoidc.GetClient(deploymentID, url, clientID, clientSecret, realm)
 }

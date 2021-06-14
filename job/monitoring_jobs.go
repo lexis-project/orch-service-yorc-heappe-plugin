@@ -115,7 +115,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if ok {
 		listChangedFilesWhileRunning, _ = strconv.ParseBool(boolStr)
 	}
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["user"])
 	if err != nil {
 		return true, err
 	}
@@ -130,17 +130,19 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if err != nil {
 		// Be resilient to temporary gateway errors here while a job is running
 		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
-			strings.Contains(err.Error(), "504 Gateway Time-out")
+			strings.Contains(err.Error(), "504 Gateway Time-out") || strings.Contains(err.Error(), "i/o timeout")
 
 		if nonFatalError {
-			log.Printf("Ignoring non fatal gateway error trying to get job info: %s", err.Error())
+			log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
 		}
 		return !nonFatalError, err
 	}
 
 	if actionData.sessionID == "" {
 		// Storing the session ID for next job state check
-		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, heappeClient.GetSessionID())
+		sessionID := heappeClient.GetSessionID()
+		log.Debugf("New HEAppE session ID %s\n", sessionID)
+		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, sessionID)
 		if err != nil {
 			return true, errors.Wrapf(err, "failed to update action data for deployment %s node %s", deploymentID, actionData.nodeName)
 		}
@@ -156,6 +158,10 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	switch jobState {
 	case jobStateCompleted:
 		// job has been done successfully : unregister monitoring
+		err = updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+		if err != nil {
+			log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
+		}
 		deregister = true
 	case jobStatePending:
 		// Not yet running: monitoring is keeping on (deregister stays false)
@@ -163,7 +169,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		// job is still running : monitoring is keeping on (deregister stays false)
 		if listChangedFilesWhileRunning {
 			updateErr := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
-			if err != nil {
+			if updateErr != nil {
 				log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, updateErr.Error())
 			}
 		}
@@ -313,7 +319,7 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 		return true, errors.Errorf("Missing mandatory information filePath for actionType:%q", action.ActionType)
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["accessToken"], action.Data["refreshToken"])
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, action.Data["user"])
 	if err != nil {
 		return true, err
 	}

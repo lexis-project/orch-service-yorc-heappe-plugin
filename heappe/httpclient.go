@@ -82,8 +82,9 @@ func (c *httpclient) doRequest(method, path string, expectedStatus int, payload,
 	defer response.Body.Close()
 
 	if response.StatusCode != expectedStatus {
-		return errors.Errorf("Expected HTTP Status code %d, got %d, reason %q",
-			expectedStatus, response.StatusCode, response.Status)
+		body, _ := ioutil.ReadAll(response.Body)
+		return errors.Errorf("Expected HTTP Status code %d, got %d, reason %q, body %q",
+			expectedStatus, response.StatusCode, response.Status, string(body))
 	}
 
 	body, err := ioutil.ReadAll(response.Body)

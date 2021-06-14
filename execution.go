@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -24,7 +25,9 @@ import (
 
 	"github.com/ystia/yorc/v4/config"
 	"github.com/ystia/yorc/v4/deployments"
+	"github.com/ystia/yorc/v4/events"
 	"github.com/ystia/yorc/v4/locations"
+	"github.com/ystia/yorc/v4/log"
 	"github.com/ystia/yorc/v4/prov"
 )
 
@@ -62,12 +65,12 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 
 	locationMgr, err := locations.GetManager(cfg)
 	if err != nil {
-		return nil, err
+		return exec, err
 	}
 	locationProps, err := locationMgr.GetLocationPropertiesForNode(ctx,
 		deploymentID, nodeName, heappeInfrastructureType)
 	if err != nil {
-		return nil, err
+		return exec, err
 	}
 
 	monitoringTimeInterval := locationProps.GetDuration(locationJobMonitoringTimeInterval)
@@ -76,16 +79,73 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		monitoringTimeInterval = locationDefaultMonitoringTimeInterval
 	}
 
-	accessToken, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
-		nodeName, "accessToken")
+	ids, err := deployments.GetNodeInstancesIds(ctx, deploymentID, nodeName)
 	if err != nil {
 		return exec, err
 	}
 
-	refreshToken, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
-		nodeName, "refreshToken")
+	if len(ids) == 0 {
+		return exec, errors.Errorf("Found no instance for node %s in deployment %s", nodeName, deploymentID)
+	}
+
+	// Getting an AAI client to check token validity
+	aaiClient := job.GetAAIClient(deploymentID, locationProps)
+
+	accessToken, err := aaiClient.GetAccessToken()
 	if err != nil {
-		return exec, err
+		return nil, err
+	}
+
+	if accessToken == "" {
+		token, err := deployments.GetStringNodePropertyValue(ctx, deploymentID,
+			nodeName, "token")
+		if err != nil {
+			return exec, err
+		}
+
+		if token == "" {
+			return exec, errors.Errorf("Found no token node %s in deployment %s", nodeName, deploymentID)
+		}
+
+		valid, err := aaiClient.IsAccessTokenValid(ctx, token)
+		if err != nil {
+			return exec, errors.Wrapf(err, "Failed to check validity of token")
+		}
+
+		if !valid {
+			errorMsg := fmt.Sprintf("Token provided in input for Job %s is not anymore valid", nodeName)
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).Registerf(errorMsg)
+			return exec, errors.Errorf(errorMsg)
+		}
+		// Exchange this token for an access and a refresh token for the orchestrator
+		accessToken, _, err = aaiClient.ExchangeToken(ctx, token)
+		if err != nil {
+			return exec, errors.Wrapf(err, "Failed to exchange token for orchestrator")
+		}
+
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
+			fmt.Sprintf("Token exchanged for an orchestrator client access/refresh token for node %s", nodeName))
+
+	}
+
+	// Checking the access token validity
+	valid, err := aaiClient.IsAccessTokenValid(ctx, accessToken)
+	if err != nil {
+		return exec, errors.Wrapf(err, "Failed to check validity of access token")
+	}
+
+	if !valid {
+		log.Printf("HEAppE plugin requests to refresh token for deployment %s\n", deploymentID)
+		accessToken, _, err = aaiClient.RefreshToken(ctx)
+		if err != nil {
+			return exec, errors.Wrapf(err, "Failed to refresh token for orchestrator")
+		}
+	}
+
+	// Getting user info
+	userInfo, err := aaiClient.GetUserInfo(ctx, accessToken)
+	if err != nil {
+		return exec, errors.Wrapf(err, "Job %s, failed to get user info from access token", nodeName)
 	}
 
 	if isJob {
@@ -96,14 +156,19 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			return exec, err
 		}
 
+		if listFiles {
+			// Setting a specific monitoring interval to not overload the access
+			// to Cluster file system
+			monitoringTimeInterval = 5 * time.Minute
+		}
+
 		exec = &job.Execution{
 			KV:                     kv,
 			Cfg:                    cfg,
 			DeploymentID:           deploymentID,
 			TaskID:                 taskID,
 			NodeName:               nodeName,
-			AccessToken:            accessToken,
-			RefreshToken:           refreshToken,
+			User:                   userInfo.GetName(),
 			ListFilesWhileRunning:  listFiles,
 			Operation:              operation,
 			MonitoringTimeInterval: monitoringTimeInterval,
@@ -145,8 +210,7 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 		DeploymentID:           deploymentID,
 		TaskID:                 taskID,
 		NodeName:               nodeName,
-		AccessToken:            accessToken,
-		RefreshToken:           refreshToken,
+		User:                   userInfo.GetName(),
 		Operation:              operation,
 		MonitoringTimeInterval: monitoringTimeInterval,
 	}
