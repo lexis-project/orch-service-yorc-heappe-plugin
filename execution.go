@@ -156,6 +156,12 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 			return exec, err
 		}
 
+		if listFiles {
+			// Setting a specific monitoring interval to not overload the access
+			// to Cluster file system
+			monitoringTimeInterval = 5 * time.Minute
+		}
+
 		exec = &job.Execution{
 			KV:                     kv,
 			Cfg:                    cfg,
