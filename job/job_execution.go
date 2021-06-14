@@ -423,10 +423,14 @@ func updateListOfChangedFiles(ctx context.Context, heappeClient heappe.Client, d
 		changedFilesConsulAttribute, changedFiles)
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d, failed to store list of changed files", jobID)
-		return err
-	}
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
+			"Failed to store list of changed files for %s job %d : %v", nodeName, jobID, err)
+		log.Printf("Failed to store list of changed files for deployment %s node %s job %d : %v", deploymentID, nodeName, jobID, err)
 
-	return err
+	}
+	// The consul failure to store the list of changed files should not result in a job failure
+	// so the error if any is just added in logs
+	return nil
 
 }
 
