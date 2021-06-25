@@ -37,6 +37,12 @@ type PasswordCredentials struct {
 	Password string
 }
 
+// OpenStackCredentials holds OpenStack application credentials
+type OpenStackCredentials struct {
+	ApplicationCredentialsId     string
+	ApplicationCredentialsSecret string
+}
+
 // Authentication parameters
 type Authentication struct {
 	Credentials PasswordCredentials
