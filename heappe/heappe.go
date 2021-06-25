@@ -28,6 +28,7 @@ import (
 const (
 	heappeAuthREST                  = "/heappe/UserAndLimitationManagement/AuthenticateUserPassword"
 	heappeAuthOpenIDREST            = "/heappe/UserAndLimitationManagement/AuthenticateUserOpenId"
+	heappeAuthOpenStackREST         = "/heappe/UserAndLimitationManagement/AuthenticateUserOpenStack"
 	heappeCreateJobREST             = "/heappe/JobManagement/CreateJob"
 	heappeSubmitJobREST             = "/heappe/JobManagement/SubmitJob"
 	heappeCancelJobREST             = "/heappe/JobManagement/CancelJob"
@@ -71,6 +72,7 @@ type Client interface {
 	GetUserResourceUsageReport(userID int64, startTime, endTime string) (*UserResourceUsageReport, error)
 	ListAvailableClusters() ([]ClusterInfo, error)
 	GetCurrentClusterNodeUsage(nodeID int64) (ClusterNodeUsage, error)
+	GetOpenStackCredentials() (string, string, error)
 }
 
 // GetClient returns a HEAppE client for a given location
@@ -142,6 +144,30 @@ func (h *heappeClient) GetSessionID() string {
 // GetURL returns the URL of the HEAppE instance
 func (h *heappeClient) GetURL() string {
 	return h.httpClient.baseURL
+}
+
+// GetOpenStackCredentials returns OpenStack credentials for the user
+func (h *heappeClient) GetOpenStackCredentials() (string, string, error) {
+
+	tokenRefreshed := false
+	done := false
+
+	var appCreds OpenStackCredentials
+	var err error
+	for !done {
+		done = true
+		err = h.httpClient.doRequest(http.MethodPost, heappeAuthOpenStackREST, http.StatusOK, h.openIDAuth, &appCreds)
+		if err != nil {
+			if strings.Contains(err.Error(), invalidTokenError) && !tokenRefreshed {
+				h.openIDAuth.Credentials.OpenIdAccessToken, err = h.refreshToken()
+				tokenRefreshed = true
+				done = (err != nil)
+			}
+		}
+	}
+
+	return appCreds.ApplicationCredentialsId, appCreds.ApplicationCredentialsSecret, err
+
 }
 
 // CreateJob creates a HEAppE job
