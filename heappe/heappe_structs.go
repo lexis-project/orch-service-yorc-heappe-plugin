@@ -114,6 +114,7 @@ type JobSpecification struct {
 	NotifyOnAbort        bool
 	NotifyOnFinish       bool
 	NotifyOnStart        bool
+	IsExtraLong          bool
 	ClusterID            int `json:"ClusterId"`
 	FileTransferMethodID int `json:"FileTransferMethodId"`
 	Tasks                []TaskSpecification

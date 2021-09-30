@@ -188,6 +188,11 @@ data_types:
         description: Send an email notification on job start
         type: boolean
         default: false
+      IsExtraLong:
+        description: Is this job a long duration job
+        type: boolean
+        default: false
+        required: false
   org.lexis.common.heappe.types.ChangedFile:
     derived_from: tosca.datatypes.Root
     properties:

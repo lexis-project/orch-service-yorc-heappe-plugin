@@ -548,6 +548,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 		{field: &(jobSpec.NotifyOnAbort), propName: "NotifyOnAbort"},
 		{field: &(jobSpec.NotifyOnFinish), propName: "NotifyOnFinish"},
 		{field: &(jobSpec.NotifyOnStart), propName: "NotifyOnStart"},
+		{field: &(jobSpec.IsExtraLong), propName: "IsExtraLong"},
 	}
 
 	for _, boolPropName := range boolPropNames {
