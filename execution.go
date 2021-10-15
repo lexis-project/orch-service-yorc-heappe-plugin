@@ -145,7 +145,14 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	// Getting user info
 	userInfo, err := aaiClient.GetUserInfo(ctx, accessToken)
 	if err != nil {
-		return exec, errors.Wrapf(err, "Job %s, failed to get user info from access token", nodeName)
+		accessToken, _, err = aaiClient.RefreshToken(ctx)
+		if err != nil {
+			return exec, errors.Wrapf(err, "Failed to refresh token for orchestrator")
+		}
+		userInfo, err = aaiClient.GetUserInfo(ctx, accessToken)
+	}
+	if err != nil {
+		return exec, errors.Wrapf(err, "Failed to get user info from access token for node %s", nodeName)
 	}
 
 	if isJob {

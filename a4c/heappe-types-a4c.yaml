@@ -2,7 +2,7 @@ tosca_definitions_version: alien_dsl_2_0_0
 
 metadata:
   template_name: org.lexis.common.heappe-types
-  template_version: 1.0.6
+  template_version: 1.0.7
   template_author: yorc
 
 description: HEAppE types - High-End Application Execution Middleware
@@ -294,6 +294,12 @@ node_types:
         # entry_schema:
         #  type: string
         description: Map of task name - task ID
+      tasks_name_status:
+        type: map
+        # entry schema not expected by Alien4Cloud
+        # entry_schema:
+        #  type: string
+        description: Map of task name - task status
     capabilities:
       heappejob:
         type: org.lexis.common.heappe.capabilities.HeappeJob
