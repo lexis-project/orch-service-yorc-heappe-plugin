@@ -39,30 +39,31 @@ import (
 )
 
 const (
-	locationAAIURL                = "aai_url"
-	locationAAIClientID           = "aai_client_id"
-	locationAAIClientSecret       = "aai_client_secret"
-	locationAAIRealm              = "aai_realm"
-	installOperation              = "install"
-	uninstallOperation            = "uninstall"
-	enableFileTransferOperation   = "custom.enable_file_transfer"
-	disableFileTransferOperation  = "custom.disable_file_transfer"
-	listChangedFilesOperation     = "custom.list_changed_files"
-	listChangedFilesAction        = "listChangedFilesAction"
-	jobSpecificationProperty      = "JobSpecification"
-	infrastructureType            = "heappe"
-	jobIDConsulAttribute          = "job_id"
-	heappeURLConsulAttribute      = "heappe_url"
-	transferUser                  = "user"
-	transferKey                   = "key"
-	transferServer                = "server"
-	transferPath                  = "path"
-	transferConsulAttribute       = "file_transfer"
-	transferObjectConsulAttribute = "transfer_object"
-	tasksNameIDConsulAttribute    = "tasks_name_id"
-	startDateConsulAttribute      = "start_date"
-	changedFilesConsulAttribute   = "changed_files"
-	tasksParamsEnvVar             = "TASKS_PARAMETERS"
+	locationAAIURL                 = "aai_url"
+	locationAAIClientID            = "aai_client_id"
+	locationAAIClientSecret        = "aai_client_secret"
+	locationAAIRealm               = "aai_realm"
+	installOperation               = "install"
+	uninstallOperation             = "uninstall"
+	enableFileTransferOperation    = "custom.enable_file_transfer"
+	disableFileTransferOperation   = "custom.disable_file_transfer"
+	listChangedFilesOperation      = "custom.list_changed_files"
+	listChangedFilesAction         = "listChangedFilesAction"
+	jobSpecificationProperty       = "JobSpecification"
+	infrastructureType             = "heappe"
+	jobIDConsulAttribute           = "job_id"
+	heappeURLConsulAttribute       = "heappe_url"
+	transferUser                   = "user"
+	transferKey                    = "key"
+	transferServer                 = "server"
+	transferPath                   = "path"
+	transferConsulAttribute        = "file_transfer"
+	transferObjectConsulAttribute  = "transfer_object"
+	tasksNameIDConsulAttribute     = "tasks_name_id"
+	tasksNameStatusConsulAttribute = "tasks_name_status"
+	startDateConsulAttribute       = "start_date"
+	changedFilesConsulAttribute    = "changed_files"
+	tasksParamsEnvVar              = "TASKS_PARAMETERS"
 )
 
 // Execution holds job Execution properties
@@ -242,13 +243,27 @@ func (e *Execution) createJob(ctx context.Context) error {
 		return err
 	}
 
-	// Store the map providing the correspondance between task names and task IDs
+	// Store the maps providing the correspondance between task names and task IDs
+	// and correspondance between task name and task status
 	tasksNameId := make(map[string]string, len(jobInfo.Tasks))
+	tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
 	for _, taskInfo := range jobInfo.Tasks {
 		tasksNameId[taskInfo.Name] = strconv.FormatInt(taskInfo.ID, 10)
+		status, err := stateToString(taskInfo.State)
+		if err != nil {
+			return err
+		}
+		tasksNameStatus[taskInfo.Name] = status
 	}
 	err = deployments.SetAttributeComplexForAllInstances(ctx, e.DeploymentID, e.NodeName, tasksNameIDConsulAttribute,
 		tasksNameId)
+	if err != nil {
+		err = errors.Wrapf(err, "Job %d, failed to store taskIDs details", jobInfo.ID)
+		return err
+	}
+
+	err = deployments.SetAttributeComplexForAllInstances(ctx, e.DeploymentID, e.NodeName, tasksNameStatusConsulAttribute,
+		tasksNameStatus)
 	if err != nil {
 		err = errors.Wrapf(err, "Job %d, failed to store taskIDs details", jobInfo.ID)
 		return err
@@ -548,6 +563,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 		{field: &(jobSpec.NotifyOnAbort), propName: "NotifyOnAbort"},
 		{field: &(jobSpec.NotifyOnFinish), propName: "NotifyOnFinish"},
 		{field: &(jobSpec.NotifyOnStart), propName: "NotifyOnStart"},
+		{field: &(jobSpec.IsExtraLong), propName: "IsExtraLong"},
 	}
 
 	for _, boolPropName := range boolPropNames {

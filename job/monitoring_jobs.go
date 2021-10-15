@@ -35,6 +35,7 @@ import (
 
 const (
 	actionDataSessionID        = "sessionID"
+	jobStateCreated            = "CREATED"
 	jobStatePending            = "PENDING"
 	jobStateRunning            = "RUNNING"
 	jobStateCompleted          = "COMPLETED"
@@ -178,7 +179,7 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		}
 		// job has been done successfully : unregister monitoring
 		deregister = true
-	case jobStatePending:
+	case jobStateCreated, jobStatePending:
 		// Not yet running: monitoring is keeping on (deregister stays false)
 	case jobStateRunning:
 		// job is still running : monitoring is keeping on (deregister stays false)
@@ -198,6 +199,23 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 			}
 
 		}
+		// Store the map providing the correspondance between task name and task status
+		tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
+		for _, taskInfo := range jobInfo.Tasks {
+			status, err := stateToString(taskInfo.State)
+			if err != nil {
+				log.Printf("Job %s ID %d task %s has unexpected state value %d",
+					actionData.nodeName, actionData.jobID, taskInfo.Name, taskInfo.State)
+				status = jobStateCreated
+			}
+			tasksNameStatus[taskInfo.Name] = status
+		}
+		err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
+			tasksNameStatus)
+		if err != nil {
+			err = errors.Wrapf(err, "Job %d, failed to store tasks status details", jobInfo.ID)
+		}
+
 	default:
 		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
 		deregister = true
@@ -359,7 +377,7 @@ func (o *ActionOperator) getFileContent(ctx context.Context, cfg config.Configur
 	}
 
 	jobState := getJobState(jobInfo)
-	if jobState == jobStatePending {
+	if jobState == jobStateCreated || jobState == jobStatePending {
 		// Job not yet running, no need to check for files created yet
 		return false, err
 	}
@@ -445,7 +463,9 @@ func stateToString(state int) (string, error) {
 	strValue := jobStateFailed
 	var err error
 	switch state {
-	case 0, 1, 2, 4:
+	case 0, 1:
+		strValue = jobStateCreated
+	case 2, 4:
 		strValue = jobStatePending
 	case 8:
 		strValue = jobStateRunning
