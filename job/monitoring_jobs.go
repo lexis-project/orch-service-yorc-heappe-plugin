@@ -132,7 +132,9 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	if err != nil {
 		// Be resilient to temporary gateway errors here while a job is running
 		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
-			strings.Contains(err.Error(), "504 Gateway Time-out") || strings.Contains(err.Error(), "i/o timeout")
+			strings.Contains(err.Error(), "504 Gateway Time-out") ||
+			strings.Contains(err.Error(), "i/o timeout") ||
+			strings.Contains(err.Error(), "dial tcp")
 
 		if nonFatalError {
 			log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
@@ -161,19 +163,19 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	case jobStateCompleted:
 		// job has been done successfully : update the list of changed files
 		nbAttempts := 0
-		for err != nil || nbAttempts == 0 {
+		newAttempt := true
+		for newAttempt {
 			nbAttempts++
 			err = updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+			newAttempt = (err != nil)
 			if err != nil {
-				// Be resilient to temporary gateway errors here
-				nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
-					strings.Contains(err.Error(), "504 Gateway Time-out") || strings.Contains(err.Error(), "i/o timeout")
-
-				if nonFatalError && nbAttempts < 10 {
-					log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
-					time.Sleep(30 * time.Second)
+				// Be resilient to temporary errors here
+				if nbAttempts < 15 {
+					log.Printf("Retrying to get list of files for job %d after error %s", actionData.jobID, err.Error())
+					time.Sleep(60 * time.Second)
 				} else {
 					log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
+					newAttempt = false
 				}
 			}
 		}
