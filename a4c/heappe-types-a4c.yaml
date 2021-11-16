@@ -346,7 +346,7 @@ node_types:
     description: >
       HEAppE Job
   org.lexis.common.heappe.nodes.JobWithRuntimeTaskParameters:
-    derived_from: org.lexis.common.heappe.nodes.pub.Job
+    derived_from: org.lexis.common.heappe.nodes.Job
     description: >
       HEAppE Job where tasks parameters are provided by another component
     requirements:
@@ -363,6 +363,23 @@ node_types:
           implementation:
             file: heappe-types-a4c.yaml
             type: tosca.artifacts.Deployment.Image.Container.Docker
+  org.lexis.common.heappe.nodes.UrgentComputingMonitorJob:
+    derived_from: org.lexis.common.heappe.nodes.Job
+    description: >
+      Job monitoring HEAppE jobs until a first job ends successfully and providing
+      the same attributes values
+    properties:
+      cancelRemainingJobs:
+        description: Cancel remaining jobs once a job has ended successfully
+        type: boolean
+        required: false
+        default: false
+    requirements:
+      - heappe_job:
+          capability: org.lexis.common.heappe.capabilities.HeappeJob
+          node: org.lexis.common.heappe.nodes.Job
+          relationship: org.lexis.common.heappe.relationships.DependsOnJob
+          occurrences: [1, UNBOUNDED]
   org.lexis.common.heappe.nodes.pub.WaitFileAndGetContentJob:
     derived_from: tosca.nodes.Root
     abstract: true
