@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// Set ActionFunc that implements an ActionOperator for HEAppE jobs
-	servConfig.ActionTypes = []string{"heappe-job-monitoring", "heappe-filecontent-monitoring"}
+	servConfig.ActionTypes = []string{"heappe-job-monitoring", "heappe-job-urgent-computing-monitoring", "heappe-filecontent-monitoring"}
 	servConfig.ActionFunc = func() prov.ActionOperator {
 		return new(job.ActionOperator)
 	}

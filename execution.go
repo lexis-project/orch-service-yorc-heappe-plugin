@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -36,6 +37,7 @@ const (
 	locationJobMonitoringTimeInterval     = "job_monitoring_time_interval"
 	locationDefaultMonitoringTimeInterval = 5 * time.Second
 	heappeJobType                         = "org.lexis.common.heappe.nodes.pub.Job"
+	heappeUrgentComputingMonitorJob       = "org.lexis.common.heappe.nodes.UrgentComputingMonitorJob"
 	heappeSendDatasetType                 = "org.lexis.common.heappe.nodes.Dataset"
 	heappeReceiveDatasetType              = "org.lexis.common.heappe.nodes.Results"
 	heappeWaitFileGetContent              = "org.lexis.common.heappe.nodes.WaitFileAndGetContentJob"
@@ -157,6 +159,41 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 
 	if isJob {
 
+		strVal, err := deployments.GetStringNodePropertyValue(ctx, deploymentID, nodeName, "monitoringTimeInterval")
+		if err != nil {
+			return exec, err
+		}
+
+		if len(strVal) > 0 {
+			monitoringIntervalInSeconds, err := strconv.Atoi(strVal)
+			if err != nil {
+				return exec, err
+			}
+			monitoringTimeInterval = time.Duration(monitoringIntervalInSeconds) * time.Second
+		}
+
+		isUrgentComputingJob, err := deployments.IsNodeDerivedFrom(ctx, deploymentID, nodeName, heappeUrgentComputingMonitorJob)
+		if err != nil {
+			return exec, err
+		}
+
+		if isUrgentComputingJob {
+
+			exec = &job.Execution{
+				KV:                     kv,
+				Cfg:                    cfg,
+				DeploymentID:           deploymentID,
+				TaskID:                 taskID,
+				NodeName:               nodeName,
+				User:                   userInfo.GetName(),
+				Operation:              operation,
+				MonitoringTimeInterval: monitoringTimeInterval,
+			}
+
+			return exec, exec.ResolveExecution(ctx)
+		}
+
+		// Regular HEAppE job
 		listFiles, err := deployments.GetBooleanNodeProperty(ctx, deploymentID,
 			nodeName, "listChangedFilesWhileRunning")
 		if err != nil {

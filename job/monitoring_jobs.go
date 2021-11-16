@@ -76,6 +76,10 @@ func (o *ActionOperator) ExecAction(ctx context.Context, cfg config.Configuratio
 		return o.monitorJob(ctx, cfg, deploymentID, action)
 	}
 
+	if action.ActionType == "heappe-job-urgent-computing-monitoring" {
+		return o.monitorUrgentComputingJob(ctx, cfg, deploymentID, action)
+	}
+
 	if action.ActionType == "heappe-filecontent-monitoring" {
 		return o.getFileContent(ctx, cfg, deploymentID, action)
 	}
@@ -236,6 +240,222 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 	// If the job state is a final state, print job logs before printing the state change
 	if deregister {
 		// Updtae list of files changed by the job
+		err := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+		if err != nil {
+			log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
+		}
+		// Log job outputs
+		logErr := o.getJobOutputs(ctx, heappeClient, deploymentID, actionData.nodeName, action, jobInfo)
+		if logErr != nil {
+			log.Printf("Failed to get job outputs : %s", logErr.Error())
+		}
+		// Print state change
+		if previousJobState != jobState {
+			err := deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobState)
+			if err != nil {
+				log.Printf("Failed to set Job %d state %s: %s", actionData.jobID, jobState, err.Error())
+			}
+		}
+
+	} else {
+		// Print state change
+		if previousJobState != jobState {
+			err := deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobState)
+			if err != nil {
+				log.Printf("Failed to set instance %s %s state %s: %s", deploymentID, actionData.nodeName, jobState, err.Error())
+			}
+		}
+		// Log job outputs
+		if jobState == jobStateRunning {
+			logErr := o.getJobOutputs(ctx, heappeClient, deploymentID, actionData.nodeName, action, jobInfo)
+			if logErr != nil {
+				log.Printf("Failed to get job outputs : %s", logErr.Error())
+			}
+		}
+	}
+
+	return deregister, err
+}
+
+func (o *ActionOperator) monitorUrgentComputingJob(ctx context.Context, cfg config.Configuration, deploymentID string, action *prov.Action) (bool, error) {
+	var (
+		err        error
+		deregister bool
+		ok         bool
+	)
+
+	actionData := &actionData{}
+	// Check nodeName
+	actionData.nodeName, ok = action.Data["nodeName"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information nodeName for actionType:%q", action.ActionType)
+	}
+
+	// Check taskID
+	actionData.taskID, ok = action.Data["taskID"]
+	if !ok {
+		return true, errors.Errorf("Missing mandatory information taskID for actionType:%q", action.ActionType)
+	}
+
+	cancelRemainingJobs := false
+	boolStr, ok := action.Data[actionCancelRemainingJobs]
+	if ok {
+		cancelRemainingJobs, _ = strconv.ParseBool(boolStr)
+	}
+
+	user := action.Data["user"]
+
+	heappeJobNodeNames := strings.Split(action.Data[actionAssociatedHEAppeJobNodeNames], ",")
+	for _, heappeJobNodeName := range heappeJobNodeNames {
+		jobExec := Execution{
+			DeploymentID: deploymentID,
+			NodeName:     heappeJobNodeName,
+		}
+		jobID, err := jobExec.getJobID(ctx)
+		if err != nil {
+			return true, err
+		}
+		heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, heappeJobNodeName, user)
+		if err != nil {
+			return true, err
+		}
+		jobInfo, err := heappeClient.GetJobInfo(jobID)
+		if err != nil {
+			// Be resilient to temporary gateway errors here while a job is running
+			nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
+				strings.Contains(err.Error(), "504 Gateway Time-out") ||
+				strings.Contains(err.Error(), "i/o timeout") ||
+				strings.Contains(err.Error(), "dial tcp")
+
+			if nonFatalError {
+				log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
+			}
+			return !nonFatalError, err
+		}
+		jobState := getJobState(jobInfo)
+		log.Debugf("Job %s state %s", heappeJobNodeName, jobState)
+
+		// TODO: check job state
+	}
+
+	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, user)
+	if err != nil {
+		return true, err
+	}
+
+	// Set session ID if defined, else a new session will be created
+	actionData.sessionID, ok = action.Data[actionDataSessionID]
+	if ok && actionData.sessionID != "" {
+		heappeClient.SetSessionID(actionData.sessionID)
+	}
+
+	jobInfo, err := heappeClient.GetJobInfo(actionData.jobID)
+	if err != nil {
+		// Be resilient to temporary gateway errors here while a job is running
+		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
+			strings.Contains(err.Error(), "504 Gateway Time-out") ||
+			strings.Contains(err.Error(), "i/o timeout") ||
+			strings.Contains(err.Error(), "dial tcp")
+
+		if nonFatalError {
+			log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
+		}
+		return !nonFatalError, err
+	}
+
+	if actionData.sessionID == "" {
+		// Storing the session ID for next job state check
+		sessionID := heappeClient.GetSessionID()
+		log.Debugf("New HEAppE session ID %s\n", sessionID)
+		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, sessionID)
+		if err != nil {
+			return true, errors.Wrapf(err, "failed to update action data for deployment %s node %s", deploymentID, actionData.nodeName)
+		}
+	}
+
+	jobState := getJobState(jobInfo)
+	previousJobState, err := deployments.GetInstanceStateString(ctx, deploymentID, actionData.nodeName, "0")
+	if err != nil {
+		return true, errors.Wrapf(err, "failed to get instance state for job %d", actionData.jobID)
+	}
+
+	// See if monitoring must be continued and set job state if terminated
+	switch jobState {
+	case jobStateCompleted:
+		// job has been done successfully : update the list of changed files
+		nbAttempts := 0
+		newAttempt := true
+		for newAttempt {
+			nbAttempts++
+			err = updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+			newAttempt = (err != nil)
+			if err != nil {
+				// Be resilient to temporary errors here
+				if nbAttempts < 15 {
+					log.Printf("Retrying to get list of files for job %d after error %s", actionData.jobID, err.Error())
+					time.Sleep(60 * time.Second)
+				} else {
+					log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
+					newAttempt = false
+				}
+			}
+		}
+		// job has been done successfully : unregister monitoring
+		deregister = true
+	case jobStateCreated, jobStatePending:
+		// Not yet running: monitoring is keeping on (deregister stays false)
+	case jobStateRunning:
+		// job is still running : monitoring is keeping on (deregister stays false)
+		// Update the start date the first time this job is seen running
+		if previousJobState != jobState {
+			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+				startDateConsulAttribute, jobInfo.StartTime)
+			if updateErr != nil {
+				log.Printf("Failed to set job start date %s for Job %s ID %d: %s",
+					jobInfo.SubmitTime, actionData.nodeName, actionData.jobID, updateErr.Error())
+			}
+
+		}
+		// Store the map providing the correspondance between task name and task status
+		tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
+		for _, taskInfo := range jobInfo.Tasks {
+			status, err := stateToString(taskInfo.State)
+			if err != nil {
+				log.Printf("Job %s ID %d task %s has unexpected state value %d",
+					actionData.nodeName, actionData.jobID, taskInfo.Name, taskInfo.State)
+				status = jobStateCreated
+			}
+			tasksNameStatus[taskInfo.Name] = status
+		}
+		err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
+			tasksNameStatus)
+		if err != nil {
+			err = errors.Wrapf(err, "Job %d, failed to store tasks status details", jobInfo.ID)
+		}
+
+	default:
+		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
+		deregister = true
+		// Log event containing all the slurm information
+
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(fmt.Sprintf("job state:%+v", jobState))
+		// Error to be returned
+		exitStatus := getJobExitStatus(jobInfo)
+		if exitStatus == "" {
+			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q", jobInfo.Name, actionData.jobID, jobState)
+		} else {
+			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q, exit status: %s", jobInfo.Name, actionData.jobID, jobState, exitStatus)
+		}
+	}
+
+	// If the job state is a final state, print job logs before printing the state change
+	if deregister {
+
+		if cancelRemainingJobs {
+			// TODO cancel remaining jobs
+		}
+
+		// Update list of files changed by the job
 		err := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
 		if err != nil {
 			log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
