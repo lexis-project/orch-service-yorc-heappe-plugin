@@ -179,13 +179,19 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 
 		if isUrgentComputingJob {
 
-			exec = &job.Execution{
+			cancelRemainingJobs, err := deployments.GetBooleanNodeProperty(ctx, deploymentID, nodeName, "cancelRemainingJobs")
+			if err != nil {
+				return exec, err
+			}
+
+			exec = &job.UrgentComputingExecution{
 				KV:                     kv,
 				Cfg:                    cfg,
 				DeploymentID:           deploymentID,
 				TaskID:                 taskID,
 				NodeName:               nodeName,
 				User:                   userInfo.GetName(),
+				CancelRemainingJobs:    cancelRemainingJobs,
 				Operation:              operation,
 				MonitoringTimeInterval: monitoringTimeInterval,
 			}
