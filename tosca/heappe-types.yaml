@@ -2,7 +2,7 @@ tosca_definitions_version: yorc_tosca_simple_yaml_1_0
 
 metadata:
   template_name: org.lexis.common.heappe-types
-  template_version: 1.0.7
+  template_version: 1.0.8
   template_author: lexis
 
 description: HEAppE types - High-End Application Execution Middleware
