@@ -49,7 +49,7 @@ type UrgentComputingExecution struct {
 	TaskID                 string
 	NodeName               string
 	User                   string
-	cancelRemainingJobs    bool
+	CancelRemainingJobs    bool
 	Operation              prov.Operation
 	MonitoringTimeInterval time.Duration
 }
@@ -64,7 +64,7 @@ func (u *UrgentComputingExecution) ExecuteAsync(ctx context.Context) (*prov.Acti
 	data["taskID"] = u.TaskID
 	data["nodeName"] = u.NodeName
 	data["user"] = u.User
-	data[actionCancelRemainingJobs] = strconv.FormatBool(u.cancelRemainingJobs)
+	data[actionCancelRemainingJobs] = strconv.FormatBool(u.CancelRemainingJobs)
 
 	// Get associated HEAppE job names
 	jobNodeNames, err := u.getAssociatedHEAppEJobNodeNames(ctx)
@@ -178,13 +178,11 @@ func (u *UrgentComputingExecution) getAssociatedHEAppEJobNodeNames(ctx context.C
 	// Get the associated targets
 	for _, nodeReq := range nodeTemplate.Requirements {
 		for _, reqAssignment := range nodeReq {
-			// Check the corresponding node is not skipped
-			heappeNodeTemplate, err := getStoredNodeTemplate(ctx, u.DeploymentID, reqAssignment.Node)
+			isSkipped, err := isSkippedJob(ctx, u.DeploymentID, reqAssignment.Node)
 			if err != nil {
 				return heappeJobNodeNames, err
 			}
-			if len(heappeNodeTemplate.Metadata[tosca.MetadataLocationNameKey]) > 0 &&
-				heappeNodeTemplate.Metadata[tosca.MetadataLocationNameKey] == "SKIPPED" {
+			if isSkipped {
 				log.Debugf("Ignoring HEAppE job %s to skip", reqAssignment.Node)
 				continue
 			}
@@ -203,4 +201,16 @@ func getStoredNodeTemplate(ctx context.Context, deploymentID, nodeName string) (
 		err = errors.Errorf("No such node %s in deployment %s", nodeName, deploymentID)
 	}
 	return node, err
+}
+
+func isSkippedJob(ctx context.Context, deploymentID, nodeName string) (bool, error) {
+	isSkipped := false
+	// Check the corresponding node is not skipped
+	heappeNodeTemplate, err := getStoredNodeTemplate(ctx, deploymentID, nodeName)
+	if err != nil {
+		return isSkipped, err
+	}
+	isSkipped = len(heappeNodeTemplate.Metadata[tosca.MetadataLocationNameKey]) > 0 &&
+		heappeNodeTemplate.Metadata[tosca.MetadataLocationNameKey] == "SKIPPED"
+	return isSkipped, err
 }

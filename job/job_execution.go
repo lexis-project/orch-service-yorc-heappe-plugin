@@ -180,6 +180,27 @@ func (e *Execution) ResolveExecution(ctx context.Context) error {
 
 func (e *Execution) createJob(ctx context.Context) error {
 
+	// Check the corresponding node is not skipped
+	isSkipped, err := isSkippedJob(ctx, e.DeploymentID, e.NodeName)
+	if err != nil {
+		return err
+	}
+	if isSkipped {
+		err = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
+			jobIDConsulAttribute, "0")
+		if err != nil {
+			err = errors.Wrapf(err, "Failed to store skipped job id 0 for %s", e.NodeName)
+			return err
+		}
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE creation", e.NodeName)
+		return err
+	}
+
+	// Store the cancel that will be set to true if ever this job is canceled by an urgent computing job
+	_ = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		cancelFlagConsulAttribute, strconv.FormatBool(false))
+
 	jobSpec, err := e.getJobSpecification(ctx)
 	if err != nil {
 		return err
@@ -322,6 +343,11 @@ func (e *Execution) deleteJob(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE deletion", e.NodeName)
+		return err
+	}
 
 	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
@@ -338,6 +364,12 @@ func (e *Execution) submitJob(ctx context.Context) error {
 		return err
 	}
 
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE submission", e.NodeName)
+		return err
+	}
+
 	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
@@ -350,6 +382,12 @@ func (e *Execution) enableFileTransfer(ctx context.Context) error {
 
 	jobID, err := e.getJobID(ctx)
 	if err != nil {
+		return err
+	}
+
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE enable file transfer", e.NodeName)
 		return err
 	}
 
@@ -370,6 +408,12 @@ func (e *Execution) disableFileTransfer(ctx context.Context) error {
 
 	jobID, err := e.getJobID(ctx)
 	if err != nil {
+		return err
+	}
+
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE disable file transfer", e.NodeName)
 		return err
 	}
 
@@ -416,6 +460,12 @@ func (e *Execution) listChangedFiles(ctx context.Context) error {
 
 	jobID, err := e.getJobID(ctx)
 	if err != nil {
+		return err
+	}
+
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE list changed files", e.NodeName)
 		return err
 	}
 
@@ -484,12 +534,26 @@ func (e *Execution) cancelJob(ctx context.Context) error {
 		return err
 	}
 
+	if jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, e.DeploymentID).Registerf(
+			"Job %s is skipped, no HEAppE cancelation", e.NodeName)
+		return err
+	}
+
 	heappeClient, err := getHEAppEClient(ctx, e.Cfg, e.DeploymentID, e.NodeName, e.User)
 	if err != nil {
 		return err
 	}
 
 	return heappeClient.CancelJob(jobID)
+}
+
+func (e *Execution) cancelJobForUrgentComputing(ctx context.Context) error {
+	// Set the flag notifying the cancellation by urgent computing so that
+	// the final status of the job set by the monitoring task will not show a failure
+	_ = deployments.SetAttributeForAllInstances(ctx, e.DeploymentID, e.NodeName,
+		cancelFlagConsulAttribute, strconv.FormatBool(true))
+	return e.cancelJob(ctx)
 }
 
 func (e *Execution) getJobID(ctx context.Context) (int64, error) {
@@ -573,8 +637,6 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 			return jobSpec, err
 		}
 	}
-
-	// TODO: get environement variables
 
 	// Getting associated tasks
 	tasks, err := deployments.GetNodePropertyValue(ctx, e.DeploymentID, e.NodeName, jobSpecificationProperty, "Tasks")

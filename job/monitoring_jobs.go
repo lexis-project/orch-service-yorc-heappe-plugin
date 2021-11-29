@@ -17,6 +17,7 @@ package job
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -110,6 +111,17 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		return true, errors.Wrapf(err, "Unexpected Job ID value %q for deployment %s node %s", jobIDstr, deploymentID, actionData.nodeName)
 	}
 
+	if actionData.jobID == 0 {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).Registerf(
+			"Job %s is skipped, ending monitoring task with success", actionData.nodeName)
+		err := deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateCompleted)
+		if err != nil {
+			log.Printf("Failed to set Job %s state %s: %s", actionData.nodeName, jobStateCompleted, err.Error())
+			return false, err
+		}
+		// ending monitoring on success
+		return true, err
+	}
 	// Check taskID
 	actionData.taskID, ok = action.Data["taskID"]
 	if !ok {
@@ -205,27 +217,32 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 			}
 
 		}
-		// Store the map providing the correspondance between task name and task status
-		tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
-		for _, taskInfo := range jobInfo.Tasks {
-			status, err := stateToString(taskInfo.State)
-			if err != nil {
-				log.Printf("Job %s ID %d task %s has unexpected state value %d",
-					actionData.nodeName, actionData.jobID, taskInfo.Name, taskInfo.State)
-				status = jobStateCreated
-			}
-			tasksNameStatus[taskInfo.Name] = status
-		}
-		err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
-			tasksNameStatus)
-		if err != nil {
-			err = errors.Wrapf(err, "Job %d, failed to store tasks status details", jobInfo.ID)
-		}
 
 	default:
 		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
 		deregister = true
-		// Log event containing all the slurm information
+		// Log event containing all the job information
+		isCanceledByUrgentComputing := false
+		var val *deployments.TOSCAValue
+		val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, actionData.nodeName, "0", cancelFlagConsulAttribute)
+		if err != nil {
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to get %s attribute %s: %s", actionData.nodeName, cancelFlagConsulAttribute, err.Error()))
+		} else if val != nil {
+			isCanceledByUrgentComputing, _ = strconv.ParseBool(val.RawString())
+		}
+
+		if isCanceledByUrgentComputing {
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).RegisterAsString(
+				fmt.Sprintf("Job %d node %s was canceled for urgent computing, setting its state to %s",
+					actionData.jobID, actionData.nodeName, jobStateCompleted))
+
+			err = deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateCompleted)
+			if err != nil {
+				log.Printf("Failed to set Job %d state %s: %s", actionData.jobID, jobState, err.Error())
+			}
+			return true, err
+		}
 
 		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(fmt.Sprintf("job state:%+v", jobState))
 		// Error to be returned
@@ -235,6 +252,23 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 		} else {
 			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q, exit status: %s", jobInfo.Name, actionData.jobID, jobState, exitStatus)
 		}
+	}
+
+	// Store the map providing the correspondance between task name and task status
+	tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
+	for _, taskInfo := range jobInfo.Tasks {
+		status, err := stateToString(taskInfo.State)
+		if err != nil {
+			log.Printf("Job %s ID %d task %s has unexpected state value %d",
+				actionData.nodeName, actionData.jobID, taskInfo.Name, taskInfo.State)
+			status = jobStateCreated
+		}
+		tasksNameStatus[taskInfo.Name] = status
+	}
+	setAttrErr := deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
+		tasksNameStatus)
+	if setAttrErr != nil {
+		err = errors.Wrapf(setAttrErr, "Job %d, failed to store tasks status details", jobInfo.ID)
 	}
 
 	// If the job state is a final state, print job logs before printing the state change
@@ -278,11 +312,8 @@ func (o *ActionOperator) monitorJob(ctx context.Context, cfg config.Configuratio
 }
 
 func (o *ActionOperator) monitorUrgentComputingJob(ctx context.Context, cfg config.Configuration, deploymentID string, action *prov.Action) (bool, error) {
-	var (
-		err        error
-		deregister bool
-		ok         bool
-	)
+	var err error
+	var ok bool
 
 	actionData := &actionData{}
 	// Check nodeName
@@ -305,7 +336,30 @@ func (o *ActionOperator) monitorUrgentComputingJob(ctx context.Context, cfg conf
 
 	user := action.Data["user"]
 
+	isCanceled := false
+	val, err := deployments.GetInstanceAttributeValue(ctx, deploymentID, actionData.nodeName, "0", cancelFlagConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", actionData.nodeName, cancelFlagConsulAttribute, err.Error()))
+	} else if val != nil {
+		isCanceled, _ = strconv.ParseBool(val.RawString())
+	}
+
+	if isCanceled {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).RegisterAsString(
+			fmt.Sprintf("Terminating  %s as job was canceled", actionData.nodeName))
+		// Set state
+		err = deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateFailed)
+		if err != nil {
+			log.Printf("Failed to set instance %s %s state %s: %s", deploymentID, actionData.nodeName, jobStateFailed, err.Error())
+		}
+		return true, err
+	}
 	heappeJobNodeNames := strings.Split(action.Data[actionAssociatedHEAppeJobNodeNames], ",")
+	var jobDoneID int64
+	var jobDoneNodeName string
+	allFinished := true
+	cancelJobNodeNameID := make(map[string]int64)
 	for _, heappeJobNodeName := range heappeJobNodeNames {
 		jobExec := Execution{
 			DeploymentID: deploymentID,
@@ -335,162 +389,191 @@ func (o *ActionOperator) monitorUrgentComputingJob(ctx context.Context, cfg conf
 		jobState := getJobState(jobInfo)
 		log.Debugf("Job %s state %s", heappeJobNodeName, jobState)
 
-		// TODO: check job state
+		switch jobState {
+		case jobStateCompleted:
+			// job has been done successfully
+			jobDoneID = jobID
+			jobDoneNodeName = heappeJobNodeName
+			if !cancelRemainingJobs {
+				// No cancel of running job needed, no need to check other jobs statuses
+				break
+			}
+		case jobStateCreated, jobStatePending, jobStateRunning:
+			// Not yet running: monitoring is keeping on (deregister stays false)
+			allFinished = false
+			if cancelRemainingJobs {
+				cancelJobNodeNameID[heappeJobNodeName] = jobID
+			}
+		default:
+			// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(fmt.Sprintf("job state:%+v", jobState))
+		}
+
+	} // end loop on jobs
+
+	if jobDoneNodeName == "" {
+		if !allFinished {
+			log.Debugf("%s: no job done yet and jobs still running, still monitoring...", actionData.nodeName)
+			return false, nil
+		} else {
+			err = errors.Errorf("%s: all monitored job finished and no job succeeded", actionData.nodeName)
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(err.Error())
+			return true, err
+		}
 	}
 
-	heappeClient, err := getHEAppEClient(ctx, cfg, deploymentID, actionData.nodeName, user)
+	// A job is done, exposing its attribute values here
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+		jobIDConsulAttribute, strconv.FormatInt(jobDoneID, 10))
 	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to store job ID %d in urgent computing job %s: %s", jobDoneID, actionData.nodeName, err.Error()))
 		return true, err
 	}
 
-	// Set session ID if defined, else a new session will be created
-	actionData.sessionID, ok = action.Data[actionDataSessionID]
-	if ok && actionData.sessionID != "" {
-		heappeClient.SetSessionID(actionData.sessionID)
-	}
-
-	jobInfo, err := heappeClient.GetJobInfo(actionData.jobID)
+	heappeURL := ""
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", heappeURLConsulAttribute)
 	if err != nil {
-		// Be resilient to temporary gateway errors here while a job is running
-		nonFatalError := strings.Contains(err.Error(), "502 Bad Gateway") ||
-			strings.Contains(err.Error(), "504 Gateway Time-out") ||
-			strings.Contains(err.Error(), "i/o timeout") ||
-			strings.Contains(err.Error(), "dial tcp")
-
-		if nonFatalError {
-			log.Printf("Ignoring non fatal error trying to get job info: %s", err.Error())
-		}
-		return !nonFatalError, err
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, heappeURLConsulAttribute, err.Error()))
+		return true, err
+	} else if val != nil {
+		heappeURL = val.RawString()
 	}
-
-	if actionData.sessionID == "" {
-		// Storing the session ID for next job state check
-		sessionID := heappeClient.GetSessionID()
-		log.Debugf("New HEAppE session ID %s\n", sessionID)
-		err = scheduling.UpdateActionData(nil, action.ID, actionDataSessionID, sessionID)
-		if err != nil {
-			return true, errors.Wrapf(err, "failed to update action data for deployment %s node %s", deploymentID, actionData.nodeName)
-		}
-	}
-
-	jobState := getJobState(jobInfo)
-	previousJobState, err := deployments.GetInstanceStateString(ctx, deploymentID, actionData.nodeName, "0")
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+		heappeURLConsulAttribute, heappeURL)
 	if err != nil {
-		return true, errors.Wrapf(err, "failed to get instance state for job %d", actionData.jobID)
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to store HEAppE URL in urgent computing job %s: %s", actionData.nodeName, err.Error()))
 	}
 
-	// See if monitoring must be continued and set job state if terminated
-	switch jobState {
-	case jobStateCompleted:
-		// job has been done successfully : update the list of changed files
-		nbAttempts := 0
-		newAttempt := true
-		for newAttempt {
-			nbAttempts++
-			err = updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
-			newAttempt = (err != nil)
-			if err != nil {
-				// Be resilient to temporary errors here
-				if nbAttempts < 15 {
-					log.Printf("Retrying to get list of files for job %d after error %s", actionData.jobID, err.Error())
-					time.Sleep(60 * time.Second)
-				} else {
-					log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
-					newAttempt = false
-				}
-			}
-		}
-		// job has been done successfully : unregister monitoring
-		deregister = true
-	case jobStateCreated, jobStatePending:
-		// Not yet running: monitoring is keeping on (deregister stays false)
-	case jobStateRunning:
-		// job is still running : monitoring is keeping on (deregister stays false)
-		// Update the start date the first time this job is seen running
-		if previousJobState != jobState {
-			updateErr := deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
-				startDateConsulAttribute, jobInfo.StartTime)
-			if updateErr != nil {
-				log.Printf("Failed to set job start date %s for Job %s ID %d: %s",
-					jobInfo.SubmitTime, actionData.nodeName, actionData.jobID, updateErr.Error())
-			}
+	startDate := ""
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", startDateConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, startDateConsulAttribute, err.Error()))
+	} else if val != nil {
+		startDate = val.RawString()
+	}
+	err = deployments.SetAttributeForAllInstances(ctx, deploymentID, actionData.nodeName,
+		startDateConsulAttribute, startDate)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to store start date in urgent computing job %s: %s", actionData.nodeName, err.Error()))
+	}
 
-		}
-		// Store the map providing the correspondance between task name and task status
-		tasksNameStatus := make(map[string]string, len(jobInfo.Tasks))
-		for _, taskInfo := range jobInfo.Tasks {
-			status, err := stateToString(taskInfo.State)
-			if err != nil {
-				log.Printf("Job %s ID %d task %s has unexpected state value %d",
-					actionData.nodeName, actionData.jobID, taskInfo.Name, taskInfo.State)
-				status = jobStateCreated
-			}
-			tasksNameStatus[taskInfo.Name] = status
-		}
-		err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
-			tasksNameStatus)
+	var transferVal map[string]string
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", transferConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, transferConsulAttribute, err.Error()))
+	} else if val != nil && val.RawString() != "" {
+		err = json.Unmarshal([]byte(val.RawString()), &transferVal)
 		if err != nil {
-			err = errors.Wrapf(err, "Job %d, failed to store tasks status details", jobInfo.ID)
-		}
-
-	default:
-		// Other cases as FAILED, CANCELED : error is return with job state and job info is logged
-		deregister = true
-		// Log event containing all the slurm information
-
-		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(fmt.Sprintf("job state:%+v", jobState))
-		// Error to be returned
-		exitStatus := getJobExitStatus(jobInfo)
-		if exitStatus == "" {
-			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q", jobInfo.Name, actionData.jobID, jobState)
-		} else {
-			err = errors.Errorf("job %q with ID: %d finished unsuccessfully with state: %q, exit status: %s", jobInfo.Name, actionData.jobID, jobState, exitStatus)
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to convert file transfer details for %s from %s: %s", jobDoneNodeName, val.RawString(), err.Error()))
+			return true, err
 		}
 	}
+	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, transferConsulAttribute,
+		transferVal)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to set file transfer details in urgent computing job %s: %s", actionData.nodeName, err.Error()))
+		err = errors.Wrapf(err, "Failed to store file transfer details for %s", actionData.nodeName)
+		return true, err
+	}
 
-	// If the job state is a final state, print job logs before printing the state change
-	if deregister {
-
-		if cancelRemainingJobs {
-			// TODO cancel remaining jobs
-		}
-
-		// Update list of files changed by the job
-		err := updateListOfChangedFiles(ctx, heappeClient, deploymentID, actionData.nodeName, actionData.jobID)
+	var changedFiles []heappe.ChangedFile
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", changedFilesConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, changedFilesConsulAttribute, err.Error()))
+	} else if val != nil && val.RawString() != "" {
+		err = json.Unmarshal([]byte(val.RawString()), &changedFiles)
 		if err != nil {
-			log.Printf("Failed to update list of files changed by Job %d : %s", actionData.jobID, err.Error())
-		}
-		// Log job outputs
-		logErr := o.getJobOutputs(ctx, heappeClient, deploymentID, actionData.nodeName, action, jobInfo)
-		if logErr != nil {
-			log.Printf("Failed to get job outputs : %s", logErr.Error())
-		}
-		// Print state change
-		if previousJobState != jobState {
-			err := deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobState)
-			if err != nil {
-				log.Printf("Failed to set Job %d state %s: %s", actionData.jobID, jobState, err.Error())
-			}
-		}
-
-	} else {
-		// Print state change
-		if previousJobState != jobState {
-			err := deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobState)
-			if err != nil {
-				log.Printf("Failed to set instance %s %s state %s: %s", deploymentID, actionData.nodeName, jobState, err.Error())
-			}
-		}
-		// Log job outputs
-		if jobState == jobStateRunning {
-			logErr := o.getJobOutputs(ctx, heappeClient, deploymentID, actionData.nodeName, action, jobInfo)
-			if logErr != nil {
-				log.Printf("Failed to get job outputs : %s", logErr.Error())
-			}
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to convert changed files details for %s from %s: %s", jobDoneNodeName, val.RawString(), err.Error()))
+			return true, err
 		}
 	}
+	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, changedFilesConsulAttribute,
+		changedFiles)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to set changed files details in urgent computing job %s: %s", actionData.nodeName, err.Error()))
+		err = errors.Wrapf(err, "Failed to store changed files details for %s", actionData.nodeName)
+		return true, err
+	}
 
-	return deregister, err
+	var tasksNameId map[string]string
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", tasksNameIDConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, tasksNameIDConsulAttribute, err.Error()))
+	} else if val != nil && val.RawString() != "" {
+		err = json.Unmarshal([]byte(val.RawString()), &tasksNameId)
+		if err != nil {
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to convert tasks name - id details for %s from %s: %s", jobDoneNodeName, val.RawString(), err.Error()))
+			return true, err
+		}
+	}
+	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameIDConsulAttribute,
+		tasksNameId)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to set tasks name - id in urgent computing job %s: %s", actionData.nodeName, err.Error()))
+		err = errors.Wrapf(err, "Failed to store tasks name - id details for %s", actionData.nodeName)
+		return true, err
+	}
+
+	var tasksNameStatus map[string]string
+	val, err = deployments.GetInstanceAttributeValue(ctx, deploymentID, jobDoneNodeName, "0", tasksNameStatusConsulAttribute)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to get %s attribute %s: %s", jobDoneNodeName, tasksNameStatusConsulAttribute, err.Error()))
+	} else if val != nil && val.RawString() != "" {
+		err = json.Unmarshal([]byte(val.RawString()), &tasksNameStatus)
+		if err != nil {
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to convert tasks name - id details for %s from %s: %s", jobDoneNodeName, val.RawString(), err.Error()))
+			return true, err
+		}
+	}
+	err = deployments.SetAttributeComplexForAllInstances(ctx, deploymentID, actionData.nodeName, tasksNameStatusConsulAttribute,
+		tasksNameStatus)
+	if err != nil {
+		events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+			fmt.Sprintf("Failed to set tasks name - status in urgent computing job %s: %s", actionData.nodeName, err.Error()))
+		err = errors.Wrapf(err, "Failed to store tasks name - status details for %s", actionData.nodeName)
+		return true, err
+	}
+
+	// Set state
+	err = deployments.SetInstanceStateStringWithContextualLogs(ctx, deploymentID, actionData.nodeName, "0", jobStateCompleted)
+	if err != nil {
+		log.Printf("Failed to set instance %s %s state %s: %s", deploymentID, actionData.nodeName, jobStateCompleted, err.Error())
+	}
+
+	events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelINFO, deploymentID).RegisterAsString(
+		fmt.Sprintf("Jobs to cancel by urgent computing job %s: %v", actionData.nodeName, cancelJobNodeNameID))
+
+	// Cancel remaining jobs if requires
+	for nodeName, jobID := range cancelJobNodeNameID {
+		jobExec := Execution{
+			DeploymentID: deploymentID,
+			NodeName:     nodeName,
+			User:         user,
+		}
+		cancelErr := jobExec.cancelJobForUrgentComputing(ctx)
+		if cancelErr != nil {
+			// non-fatal error
+			events.WithContextOptionalFields(ctx).NewLogEntry(events.LogLevelERROR, deploymentID).RegisterAsString(
+				fmt.Sprintf("Failed to cancel job %d urgent computing job %s: %s", jobID, actionData.nodeName, err.Error()))
+		}
+	}
+	return true, err
 }
 
 func (o *ActionOperator) getJobOutputs(ctx context.Context, heappeClient heappe.Client,
