@@ -562,6 +562,7 @@ func (o *ActionOperator) monitorUrgentComputingJob(ctx context.Context, cfg conf
 	// Cancel remaining jobs if requires
 	for nodeName, jobID := range cancelJobNodeNameID {
 		jobExec := Execution{
+			Cfg:          cfg,
 			DeploymentID: deploymentID,
 			NodeName:     nodeName,
 			User:         user,
