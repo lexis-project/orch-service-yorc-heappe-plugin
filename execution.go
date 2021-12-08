@@ -69,10 +69,20 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	if err != nil {
 		return exec, err
 	}
-	locationProps, err := locationMgr.GetLocationPropertiesForNode(ctx,
-		deploymentID, nodeName, heappeInfrastructureType)
-	if err != nil {
-		return exec, err
+	isSkipped, _ := job.IsSkippedJob(ctx, deploymentID, nodeName)
+	var locationProps config.DynamicMap
+	if isSkipped {
+		// take any location of heappe type to get location properties
+		locationProps, err = locationMgr.GetPropertiesForFirstLocationOfType(heappeInfrastructureType)
+		if err != nil {
+			return exec, err
+		}
+	} else {
+		locationProps, err = locationMgr.GetLocationPropertiesForNode(ctx,
+			deploymentID, nodeName, heappeInfrastructureType)
+		if err != nil {
+			return exec, err
+		}
 	}
 
 	monitoringTimeInterval := locationProps.GetDuration(locationJobMonitoringTimeInterval)

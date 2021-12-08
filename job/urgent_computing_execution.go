@@ -178,7 +178,7 @@ func (u *UrgentComputingExecution) getAssociatedHEAppEJobNodeNames(ctx context.C
 	// Get the associated targets
 	for _, nodeReq := range nodeTemplate.Requirements {
 		for _, reqAssignment := range nodeReq {
-			isSkipped, err := isSkippedJob(ctx, u.DeploymentID, reqAssignment.Node)
+			isSkipped, err := IsSkippedJob(ctx, u.DeploymentID, reqAssignment.Node)
 			if err != nil {
 				return heappeJobNodeNames, err
 			}
@@ -203,7 +203,7 @@ func getStoredNodeTemplate(ctx context.Context, deploymentID, nodeName string) (
 	return node, err
 }
 
-func isSkippedJob(ctx context.Context, deploymentID, nodeName string) (bool, error) {
+func IsSkippedJob(ctx context.Context, deploymentID, nodeName string) (bool, error) {
 	isSkipped := false
 	// Check the corresponding node is not skipped
 	heappeNodeTemplate, err := getStoredNodeTemplate(ctx, deploymentID, nodeName)

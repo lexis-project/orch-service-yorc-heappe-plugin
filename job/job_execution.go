@@ -181,7 +181,7 @@ func (e *Execution) ResolveExecution(ctx context.Context) error {
 func (e *Execution) createJob(ctx context.Context) error {
 
 	// Check the corresponding node is not skipped
-	isSkipped, err := isSkippedJob(ctx, e.DeploymentID, e.NodeName)
+	isSkipped, err := IsSkippedJob(ctx, e.DeploymentID, e.NodeName)
 	if err != nil {
 		return err
 	}
