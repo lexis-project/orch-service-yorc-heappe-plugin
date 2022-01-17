@@ -588,7 +588,7 @@ func (e *Execution) getJobSpecification(ctx context.Context) (heappe.JobSpecific
 		{field: &(jobSpec.Name), propName: "Name"},
 		{field: &(jobSpec.Project), propName: "Project"},
 		{field: &(jobSpec.NotificationEmail), propName: "NotificationEmail"},
-		{field: &(jobSpec.NotificationEmail), propName: "PhoneNumber"},
+		{field: &(jobSpec.PhoneNumber), propName: "PhoneNumber"},
 	}
 
 	for _, stringPropName := range stringPropNames {
