@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -36,6 +37,7 @@ const (
 	locationJobMonitoringTimeInterval     = "job_monitoring_time_interval"
 	locationDefaultMonitoringTimeInterval = 5 * time.Second
 	heappeJobType                         = "org.lexis.common.heappe.nodes.pub.Job"
+	heappeUrgentComputingMonitorJob       = "org.lexis.common.heappe.nodes.UrgentComputingMonitorJob"
 	heappeSendDatasetType                 = "org.lexis.common.heappe.nodes.Dataset"
 	heappeReceiveDatasetType              = "org.lexis.common.heappe.nodes.Results"
 	heappeWaitFileGetContent              = "org.lexis.common.heappe.nodes.WaitFileAndGetContentJob"
@@ -67,10 +69,20 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 	if err != nil {
 		return exec, err
 	}
-	locationProps, err := locationMgr.GetLocationPropertiesForNode(ctx,
-		deploymentID, nodeName, heappeInfrastructureType)
-	if err != nil {
-		return exec, err
+	isSkipped, _ := job.IsSkippedJob(ctx, deploymentID, nodeName)
+	var locationProps config.DynamicMap
+	if isSkipped {
+		// take any location of heappe type to get location properties
+		locationProps, err = locationMgr.GetPropertiesForFirstLocationOfType(heappeInfrastructureType)
+		if err != nil {
+			return exec, err
+		}
+	} else {
+		locationProps, err = locationMgr.GetLocationPropertiesForNode(ctx,
+			deploymentID, nodeName, heappeInfrastructureType)
+		if err != nil {
+			return exec, err
+		}
 	}
 
 	monitoringTimeInterval := locationProps.GetDuration(locationJobMonitoringTimeInterval)
@@ -157,6 +169,47 @@ func newExecution(ctx context.Context, cfg config.Configuration, taskID, deploym
 
 	if isJob {
 
+		strVal, err := deployments.GetStringNodePropertyValue(ctx, deploymentID, nodeName, "monitoringTimeInterval")
+		if err != nil {
+			return exec, err
+		}
+
+		if len(strVal) > 0 {
+			monitoringIntervalInSeconds, err := strconv.Atoi(strVal)
+			if err != nil {
+				return exec, err
+			}
+			monitoringTimeInterval = time.Duration(monitoringIntervalInSeconds) * time.Second
+		}
+
+		isUrgentComputingJob, err := deployments.IsNodeDerivedFrom(ctx, deploymentID, nodeName, heappeUrgentComputingMonitorJob)
+		if err != nil {
+			return exec, err
+		}
+
+		if isUrgentComputingJob {
+
+			cancelRemainingJobs, err := deployments.GetBooleanNodeProperty(ctx, deploymentID, nodeName, "cancelRemainingJobs")
+			if err != nil {
+				return exec, err
+			}
+
+			exec = &job.UrgentComputingExecution{
+				KV:                     kv,
+				Cfg:                    cfg,
+				DeploymentID:           deploymentID,
+				TaskID:                 taskID,
+				NodeName:               nodeName,
+				User:                   userInfo.GetName(),
+				CancelRemainingJobs:    cancelRemainingJobs,
+				Operation:              operation,
+				MonitoringTimeInterval: monitoringTimeInterval,
+			}
+
+			return exec, exec.ResolveExecution(ctx)
+		}
+
+		// Regular HEAppE job
 		listFiles, err := deployments.GetBooleanNodeProperty(ctx, deploymentID,
 			nodeName, "listChangedFilesWhileRunning")
 		if err != nil {
