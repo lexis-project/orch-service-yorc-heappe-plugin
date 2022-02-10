@@ -2,6 +2,10 @@
 
 The Yorc HEAppE plugin implements a Yorc ([Ystia orchestrator](https://github.com/ystia/yorc/)) plugin as described in [Yorc documentation](https://yorc.readthedocs.io/en/latest/plugins.html), allowing the orchestrator to use the HEappE (([High-End Application Execution](http://heappe.eu)) API to manage jobs executions on HPC infrastructures.
 
+## Acknowledgement
+
+This code repository is a result / contains results of the LEXIS project. The project has received funding from the European Union’s Horizon 2020 Research and Innovation programme (2014-2020) under grant agreement No. 825532.
+
 ## To build this plugin
 
 You need first to have a working [Go environment](https://golang.org/doc/install).
