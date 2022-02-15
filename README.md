@@ -1,5 +1,7 @@
 # Yorc HEAppE plugin
 
+<a href="https://doi.org/10.5281/zenodo.6080492"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.6080492.svg" alt="DOI"></a>
+
 The Yorc HEAppE plugin implements a Yorc ([Ystia orchestrator](https://github.com/ystia/yorc/)) plugin as described in [Yorc documentation](https://yorc.readthedocs.io/en/latest/plugins.html), allowing the orchestrator to use the HEappE (([High-End Application Execution](http://heappe.eu)) API to manage jobs executions on HPC infrastructures.
 
 ## Acknowledgement
